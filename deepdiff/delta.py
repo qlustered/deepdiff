@@ -1065,7 +1065,7 @@ class Delta:
 
         return result
 
-    def to_flat_dicts(self, include_action_in_path=False, report_type_changes=True) -> List[FlatDeltaRow]:
+    def to_flat_dicts(self, include_action_in_path=False, report_type_changes=True) -> List[dict[str, Any]]:
         """
         Returns a flat list of actions that is easily machine readable.
 
@@ -1121,7 +1121,7 @@ class Delta:
         """
         return [
             i._asdict() for i in self.to_flat_rows(include_action_in_path=False, report_type_changes=True)
-        ]  # type: ignore
+        ]
 
     def to_flat_rows(self, include_action_in_path=False, report_type_changes=True) -> List[FlatDeltaRow]:
         """
