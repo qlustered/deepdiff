@@ -67,6 +67,31 @@ doc = get_doc('diff_doc.rst')
 PROGRESS_MSG = "DeepDiff {} seconds in progress. Pass #{}, Diff #{}"
 
 
+def _items_are_type_equal(a: Any, b: Any) -> bool:
+    """
+    Return True only when *a* and *b* are equal in both value AND type, recursively.
+
+    Python's ``==`` conflates int 1 and float 1.0 (``1 == 1.0`` is True), which
+    causes them to land in the same deephash bucket and be treated as identical.
+    This helper performs a stricter comparison: two items are "type-equal" only
+    when ``type(a) is type(b)`` at every level of the structure.
+
+    Used exclusively to detect hidden numeric-type differences inside items that
+    share a deephash bucket due to Python's numeric equality semantics.
+    """
+    if type(a) is not type(b):
+        return False
+    if isinstance(a, dict):
+        if a.keys() != b.keys():
+            return False
+        return all(_items_are_type_equal(a[k], b[k]) for k in a)
+    if isinstance(a, (list, tuple)):
+        if len(a) != len(b):
+            return False
+        return all(_items_are_type_equal(x, y) for x, y in zip(a, b))
+    return a == b
+
+
 def _report_progress(_stats: Dict[str, Any], progress_logger: Callable[[str], None], duration: float) -> None:
     """
     Report the progress every few seconds.
@@ -1450,8 +1475,30 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
             for hash_value in items_intersect:
                 t1_indexes = t1_hashtable[hash_value].indexes
                 t2_indexes = t2_hashtable[hash_value].indexes
+                t1_item = t1_hashtable[hash_value].item
+                t2_item = t2_hashtable[hash_value].item
                 t1_indexes_len = len(t1_indexes)
                 t2_indexes_len = len(t2_indexes)
+                # Python's numeric equality (1 == 1.0, hash(1) == hash(1.0)) can
+                # cause items that differ only in numeric type to land in the
+                # intersection.  When ignore_numeric_type_changes is False, run
+                # a type-strict equality check and diff any pairs that are not
+                # truly equal.
+                if (
+                    not self.ignore_numeric_type_changes
+                    and t1_item is not t2_item
+                    and not _items_are_type_equal(t1_item, t2_item)
+                ):
+                    for i, j in zip(t1_indexes, t2_indexes):
+                        change_level = level.branch_deeper(
+                            t1_item,
+                            t2_item,
+                            child_relationship_class=SubscriptableIterableRelationship,
+                            child_relationship_param=i,
+                            child_relationship_param2=j,
+                        )
+                        self._diff(change_level, parents_ids, local_tree=local_tree)
+                    continue  # handled — skip repetition/equality checks below
                 if t1_indexes_len != t2_indexes_len:  # this is a repetition change!
                     # create "change" entry, keep current level untouched to handle further changes
                     repetition_change_level = level.branch_deeper(
@@ -1510,6 +1557,38 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
                     # However they will stay here in case things change in future.
                     parents_ids_added = add_to_frozen_set(parents_ids, item_id)  # pragma: no cover.
                     self._diff(change_level, parents_ids_added, local_tree=local_tree)  # pragma: no cover.
+
+            # Python's numeric equality (1 == 1.0, hash(1) == hash(1.0)) can
+            # place items that differ only in numeric type into the hash
+            # intersection, causing type differences to be silently ignored.
+            # When ignore_numeric_type_changes is False, re-examine each
+            # intersection pair for hidden numeric-type changes by running a
+            # full _diff.  We skip pairs where t1 is t2 (identity) to avoid
+            # redundant work, and only run _diff when the pair is NOT identity-
+            # equal AND the DeepHash strings they produce differ — which
+            # happens here because Python's dict conflates hash(1)==hash(1.0).
+            # NOTE: use full_*_hashtable (not the reduced t*_hashtable) because
+            # the reduced tables only contain added/removed hashes.
+            if not self.ignore_numeric_type_changes:
+                items_intersect = t2_hashes.intersection(t1_hashes)
+                for hash_value in items_intersect:
+                    t1_item = full_t1_hashtable[hash_value].item
+                    t2_item = full_t2_hashtable[hash_value].item
+                    # Only re-examine if the objects are not the same Python
+                    # object AND are not strictly equal as typed objects.
+                    # We use `is not` first (cheap) then check for numeric-type
+                    # discrepancy via a recursive type-strict equality walk.
+                    if t1_item is not t2_item and not _items_are_type_equal(t1_item, t2_item):
+                        t1_idx = full_t1_hashtable[hash_value].indexes[0]
+                        t2_idx = full_t2_hashtable[hash_value].indexes[0]
+                        change_level = level.branch_deeper(
+                            t1_item,
+                            t2_item,
+                            child_relationship_class=SubscriptableIterableRelationship,
+                            child_relationship_param=t1_idx,
+                            child_relationship_param2=t2_idx,
+                        )
+                        self._diff(change_level, parents_ids, local_tree=local_tree)
 
     def _diff_booleans(self, level, local_tree=None):
         if level.t1 != level.t2:

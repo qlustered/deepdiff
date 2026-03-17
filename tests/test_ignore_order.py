@@ -1396,3 +1396,60 @@ class TestErrorMessagesWhenIgnoreOrder:
         assert {} == result
 
         assert not mock_logger.error.called
+
+
+class TestIgnoreOrderNumericTypeChange:
+    """Regression tests for GitHub issue #485.
+
+    When ignore_order=True, numerically-equal values of different numeric types
+    (e.g. int 1 vs float 1.0) must still be reported as type_changes.
+
+    Root cause: Python's hash equality (hash(1) == hash(1.0)) and value equality
+    (1 == 1.0) caused both items to land in the same DeepHash bucket, so they
+    were treated as identical and silently dropped from the diff result.
+    """
+
+    def test_int_vs_float_in_list_of_dicts(self):
+        """Core regression: type change inside a dict nested in a list."""
+        result = DeepDiff([{"a": 1}], [{"a": 1.0}], ignore_order=True)
+        assert "type_changes" in result, (
+            "Expected type_changes between int 1 and float 1.0, got: %s" % result
+        )
+        assert result["type_changes"]["root[0]['a']"]["old_type"] is int
+        assert result["type_changes"]["root[0]['a']"]["new_type"] is float
+
+    def test_ignore_numeric_type_changes_suppresses_report(self):
+        """When ignore_numeric_type_changes=True the type change must be hidden."""
+        result = DeepDiff(
+            [{"a": 1}], [{"a": 1.0}],
+            ignore_order=True,
+            ignore_numeric_type_changes=True,
+        )
+        assert result == {}, (
+            "With ignore_numeric_type_changes=True there should be no diff, got: %s" % result
+        )
+
+    def test_value_change_still_detected(self):
+        """Ordinary value differences must still be detected."""
+        result = DeepDiff([1], [2], ignore_order=True)
+        assert result != {}, "Expected a diff between [1] and [2]"
+
+    def test_reorder_no_false_positive(self):
+        """A simple reorder of identical values must not trigger type_changes."""
+        result = DeepDiff([1, 2, 3], [3, 2, 1], ignore_order=True)
+        assert result == {}, "Reordering identical ints must not produce a diff"
+
+    def test_mixed_list_one_type_change(self):
+        """Only the item with a type change should appear in the diff."""
+        result = DeepDiff(
+            [{"a": 1}, {"b": 2}],
+            [{"b": 2}, {"a": 1.0}],
+            ignore_order=True,
+        )
+        assert "type_changes" in result
+        assert "root[0]['a']" in result["type_changes"]
+
+    def test_ignore_order_false_unchanged(self):
+        """The ignore_order=False path must continue to work as before."""
+        result = DeepDiff([{"a": 1}], [{"a": 1.0}], ignore_order=False)
+        assert "type_changes" in result
