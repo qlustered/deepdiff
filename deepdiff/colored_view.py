@@ -109,11 +109,12 @@ class ColoredView:
             return '{\n' + ',\n'.join(items) + f'\n{current_indent}' + '}'
 
         elif isinstance(obj, (list, tuple)):
-            if not obj:
-                return '[]'
             removed_map = self._get_path_removed(path)
             for index in removed_map:
                 self._colorize_skip_paths.add(f"{path}[{index}]")
+
+            if not obj and not removed_map:
+                return '[]'
 
             items = []
             remove_index = 0

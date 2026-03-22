@@ -117,6 +117,22 @@ def test_colored_view_list_deletions():
     assert result == expected
 
 
+def test_colored_view_list_all_removed():
+    """Test that removing all items from a list shows them in colored view."""
+    t1 = [1, 2, 3]
+    t2 = []
+
+    diff = DeepDiff(t1, t2, view=COLORED_VIEW)
+    result = str(diff)
+
+    expected = f'''[
+  {RED}1{RESET},
+  {RED}2{RESET},
+  {RED}3{RESET}
+]'''
+    assert result == expected
+
+
 def test_colored_view_list_additions():
     t1 = [2, 4]
     t2 = [1, 2, 3, 4, 5]
