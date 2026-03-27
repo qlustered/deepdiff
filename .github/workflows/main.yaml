@@ -11,14 +11,14 @@ jobs:
       DEFAULT_PYTHON: '3.12'
     strategy:
       matrix:
-        python-version: ['3.9','3.10','3.11','3.12','3.13']
+        python-version: ['3.9','3.10','3.11','3.12','3.13','3.14']
         architecture: ['x64']
 
     steps:
       - uses: actions/checkout@v3
 
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
           architecture: ${{ matrix.architecture }}
@@ -26,7 +26,7 @@ jobs:
           cache-dependency-path: pyproject.toml
 
       - name: Install nox
-        run: pip install nox==2025.5.1
+        run: pip install nox==2026.02.09
 
       - name: Lint with flake8
         if: ${{ matrix.python-version == '3.12' }}
