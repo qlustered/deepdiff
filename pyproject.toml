@@ -8,6 +8,7 @@ version = "9.1.0"
 dependencies = [
   "cachebox>=5.2,<6",
   "orderly-set>=5.5.0,<6",
+  "click>=8.0",
 ]
 requires-python = ">=3.10"
 authors = [
@@ -40,7 +41,6 @@ coverage = [
   "coverage~=7.13.5",
 ]
 cli = [
-  "click~=8.3.1",
   "pyyaml~=6.0.3"
 ]
 dev = [
