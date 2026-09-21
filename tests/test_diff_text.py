@@ -369,6 +369,36 @@ class TestDeepDiffText:
         result = {}
         assert result == ddiff
 
+    def test_ignore_case_preserves_original_dictionary_paths(self):
+        t1 = {'User': {'AboutMe': 1}}
+        t2 = {'user': {'aboutme': 2}}
+        diff = DeepDiff(t1, t2, ignore_string_case=True)
+        assert diff == {'values_changed': {
+            "root['User']['AboutMe']": {'old_value': 1, 'new_value': 2}
+        }}
+        tree = DeepDiff(t1, t2, ignore_string_case=True, view='tree')
+        change = next(iter(tree['values_changed']))
+        assert change.path() == "root['User']['AboutMe']"
+        assert change.path(use_t2=True) == "root['user']['aboutme']"
+
+    @pytest.mark.parametrize('path_option', ['exclude_paths', 'exclude_regex_paths'])
+    def test_ignore_case_excludes_original_dictionary_path(self, path_option):
+        t1 = {'User': {'AboutMe': 1}}
+        t2 = {'User': {'AboutMe': 2}}
+        path = "root['User']['AboutMe']"
+        if path_option == 'exclude_regex_paths':
+            path = r"root\['User'\]\['AboutMe'\]$"
+        assert not DeepDiff(t1, t2, ignore_string_case=True, **{path_option: [path]})
+
+    def test_ignore_case_preserves_paths_for_nested_additions_and_removals(self):
+        t1 = {'User': {'Keep': 1, 'Removed': 2}}
+        t2 = {'user': {'keep': 1, 'Added': 3}}
+        diff = DeepDiff(t1, t2, ignore_string_case=True, threshold_to_diff_deeper=0)
+        assert diff == {
+            'dictionary_item_added': ["root['User']['Added']"],
+            'dictionary_item_removed': ["root['User']['Removed']"],
+        }
+
     def test_string_list_ignore_case(self):
         t1 = ['AboutMe', 'ALIAS']
         t2 = ['aboutme', 'alias']

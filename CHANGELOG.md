@@ -1,6 +1,7 @@
 # DeepDiff Change log
 
 - Unreleased
+    - Preserve original string key casing in reported paths when `ignore_string_case=True`, so path exclusions can use the input keys (#515).
     - Fixed missing type changes between equal-comparing items inside ordered iterables, e.g. `DeepDiff([2], [2.0])` now reports the `int` → `float` change like `DeepDiff(2, 2.0)` and `DeepDiff({'a': 2}, {'a': 2.0})` already do (issue #605).
 
 - v9-1-0
