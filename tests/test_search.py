@@ -369,6 +369,34 @@ class TestDeepSearch:
         result = {"matched_values": {"root"}}
         assert DeepSearch(obj, item, verbose_level=1, use_regexp=True) == result
 
+    @pytest.mark.parametrize('case_sensitive', [False, True])
+    @pytest.mark.parametrize('pattern, matching, nonmatching', [
+        (r'\D+', 'ABC', '123'),
+        (r'\S+', 'ABC', ' '),
+        (r'\W+', '!', 'ABC'),
+        (r'\Boo\B', 'book', 'oo'),
+        (r'\N{LATIN CAPITAL LETTER A}', 'A', 'b'),
+        (r'(?-i:ABC)', 'ABC', 'abc'),
+    ])
+    def test_regex_preserves_pattern_syntax(self, pattern, matching, nonmatching, case_sensitive):
+        result = DeepSearch([matching, nonmatching], pattern, use_regexp=True, case_sensitive=case_sensitive)
+        assert result == {'matched_values': {'root[0]'}}
+
+    @pytest.mark.parametrize('pattern, obj, expected_path', [
+        (r"\['\D+'\]$", {'ABC': 1, '123': 2}, "root['ABC']"),
+        (r"\['(?-i:ABC)'\]$", {'ABC': 1, 'abc': 2}, "root['ABC']"),
+    ])
+    def test_regex_preserves_path_syntax(self, pattern, obj, expected_path):
+        assert DeepSearch(obj, pattern, use_regexp=True) == {'matched_paths': {expected_path}}
+
+    @pytest.mark.parametrize('case_sensitive, expected_paths', [
+        (False, {'root[0]', 'root[1]'}),
+        (True, {'root[0]'}),
+    ])
+    def test_regex_case_sensitivity(self, case_sensitive, expected_paths):
+        result = DeepSearch(['ABC', 'abc', '123'], '[A-Z]+', use_regexp=True, case_sensitive=case_sensitive)
+        assert result == {'matched_values': expected_paths}
+
     def test_regex_does_not_match_the_regex_string_itself(self):
         obj = ["We like python", "but not (?:p|t)ython"]
         item = "(?:p|t)ython"
