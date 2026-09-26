@@ -106,7 +106,7 @@ class DeepSearch(Dict[str, Union[Dict[str, Any], SetOrdered, List[str]]]):
 
         self.obj: Any = obj
         self.case_sensitive: bool = case_sensitive if isinstance(item, strings) else True
-        item = item if self.case_sensitive else (item.lower() if isinstance(item, str) else item)
+        item = item if self.case_sensitive or use_regexp else (item.lower() if isinstance(item, str) else item)
         _exclude_exact, self.exclude_glob_paths = separate_wildcard_and_exact_paths(set(exclude_paths) if exclude_paths else None)
         self.exclude_paths: SetOrdered = SetOrdered(_exclude_exact) if _exclude_exact else SetOrdered()
         self.exclude_regex_paths: List[Pattern[str]] = [re.compile(exclude_regex_path) for exclude_regex_path in exclude_regex_paths]
@@ -127,7 +127,8 @@ class DeepSearch(Dict[str, Union[Dict[str, Any], SetOrdered, List[str]]]):
             item = str(item)
         if self.use_regexp:
             try:
-                item = re.compile(item)
+                flags = 0 if self.case_sensitive else re.IGNORECASE
+                item = re.compile(item, flags=flags)
             except TypeError as e:
                 raise TypeError(f"The passed item of {item} is not usable for regex: {e}") from None
         self.strict_checking: bool = strict_checking
@@ -236,7 +237,7 @@ class DeepSearch(Dict[str, Union[Dict[str, Any], SetOrdered, List[str]]]):
             parents_ids_added = add_to_frozen_set(parents_ids, item_id)
 
             new_parent = parent_text % (parent, item_key_str)
-            new_parent_cased = new_parent if self.case_sensitive else new_parent.lower()
+            new_parent_cased = new_parent if self.case_sensitive or self.use_regexp else new_parent.lower()
 
             str_item = str(item)
             if (self.match_string and str_item == new_parent_cased) or\
@@ -282,7 +283,10 @@ class DeepSearch(Dict[str, Union[Dict[str, Any], SetOrdered, List[str]]]):
 
     def __search_str(self, obj: Union[str, bytes, memoryview], item: Union[str, bytes, memoryview, Pattern[str]], parent: str) -> None:
         """Compare strings"""
-        obj_text = obj if self.case_sensitive else (obj.lower() if isinstance(obj, str) else obj)
+        obj_text = (
+            obj if self.case_sensitive or self.use_regexp
+            else (obj.lower() if isinstance(obj, str) else obj)
+        )
 
         is_matched = False
         if self.use_regexp and isinstance(item, type(re.compile(''))):
