@@ -4,6 +4,7 @@ import datetime
 import numpy as np
 from enum import Enum
 from decimal import Decimal
+from fractions import Fraction
 from deepdiff.helper import (
     short_repr, number_to_string, get_numpy_ndarray_rows,
     cartesian_product_of_shape, literal_eval_extended,
@@ -196,6 +197,29 @@ class TestHelper:
         else:
             assert st1 == expected_result[0]
             assert st2 == expected_result[1]
+
+    @pytest.mark.parametrize("value", [
+        datetime.datetime(2020, 5, 17, 22, 15),
+        datetime.date(2020, 5, 17),
+        datetime.time(22, 15),
+        datetime.timedelta(days=2, seconds=3),
+        np.datetime64("2020-05-17T22:15"),
+    ])
+    @pytest.mark.parametrize("notation", ["f", "e"])
+    def test_number_to_string_leaves_temporal_values_unchanged(self, value, notation):
+        assert number_to_string(value, 3, number_format_notation=notation) is value
+
+    @pytest.mark.parametrize("value, expected", [
+        (10, "10.00"),
+        (1.234, "1.23"),
+        (Decimal("1.234"), "1.23"),
+        (Fraction(1, 8), "0.12"),
+        (complex(1, -2), "1.00-2.00j"),
+        (np.int64(10), "10.00"),
+        (np.float64(1.234), "1.23"),
+    ])
+    def test_number_to_string_numeric_types_keep_formatting(self, value, expected):
+        assert number_to_string(value, 2) == expected
 
     def test_number_to_string_with_invalid_notation(self):
         with pytest.raises(ValueError):
