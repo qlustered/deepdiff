@@ -2135,13 +2135,17 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
         if self._count_diff() is StopIteration:
             return
 
+        # Custom operators may report differences even for identical objects.
+        if level.t1 is level.t2 and not self.custom_operators:
+            return
+
+        if self._skip_this(level):
+            return
+
         if self._use_custom_operator(level):
             return
 
         if level.t1 is level.t2:
-            return
-
-        if self._skip_this(level):
             return
 
         report_type_change = True

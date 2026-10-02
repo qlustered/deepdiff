@@ -8,6 +8,55 @@ from deepdiff.operator import BaseOperator, PrefixOrSuffixOperator, BaseOperator
 
 
 class TestOperators:
+    @pytest.mark.parametrize('exclude_options', [
+        {'exclude_paths': ['b']},
+        {'exclude_paths': ["root['b']"]},
+        {'exclude_regex_paths': [r"\['b'\]$"]},
+        {'exclude_obj_callback': lambda obj, path: path == "root['b']"},
+    ])
+    @pytest.mark.parametrize('prevent_default', [False, True])
+    def test_custom_operator_skips_excluded_paths(self, exclude_options, prevent_default):
+        matched_paths = []
+        compared_paths = []
+
+        class CustomClass:
+            def __init__(self, values):
+                self.values = values
+
+        class ListMatchOperator(BaseOperator):
+            def match(self, level):
+                matched_paths.append(level.path())
+                return super().match(level)
+
+            def give_up_diffing(self, level, diff_instance):
+                compared_paths.append(level.path())
+                if level.t1.values == level.t2.values:
+                    diff_instance.custom_report_result('equal_lists', level, {})
+                return prevent_default
+
+        shared = CustomClass([1, 2, 3])
+        t1 = {'a': shared, 'b': CustomClass([1, 2, 3])}
+        t2 = {'a': shared, 'b': CustomClass([1, 2, 3, 4])}
+
+        result = DeepDiff(t1, t2, custom_operators=[ListMatchOperator(types=[CustomClass])], **exclude_options)
+
+        assert "root['b']" not in matched_paths
+        assert compared_paths == ["root['a']"]
+        assert result == {'equal_lists': {"root['a']": {}}}
+
+    @pytest.mark.parametrize('exclude_options', [
+        {'exclude_paths': ['root']},
+        {'exclude_types': [dict]},
+    ])
+    def test_custom_operator_skips_excluded_root(self, exclude_options):
+        class UnexpectedOperator(BaseOperator):
+            def match(self, level):
+                raise AssertionError('Excluded objects should not reach custom operators')
+
+        result = DeepDiff({'a': 1}, {'a': 2}, custom_operators=[UnexpectedOperator()], **exclude_options)
+
+        assert result == {}
+
     def test_custom_operators_prevent_default(self):
         t1 = {
             "coordinates": [
