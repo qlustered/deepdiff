@@ -254,6 +254,37 @@ class TestDeepSearch:
         result = {}
         assert ds == result
 
+    @pytest.mark.parametrize('verbose_level', [1, 2])
+    @pytest.mark.parametrize('exclude', [
+        {'exclude_paths': ["root['container']['needle']"]},
+        {'exclude_paths': ["root[*]['needle']"]},
+        {'exclude_regex_paths': [r"\['needle'\]$"]},
+    ])
+    def test_excluded_dictionary_key_is_not_reported(self, verbose_level, exclude):
+        obj = {'container': {'needle': {'nested': 'needle'}}, 'keep': 'needle'}
+        expected = {'matched_values': (
+            {"root['keep']": 'needle'} if verbose_level == 2 else {"root['keep']"}
+        )}
+
+        assert DeepSearch(obj, 'needle', verbose_level=verbose_level, **exclude) == expected
+
+    @pytest.mark.parametrize('verbose_level', [1, 2])
+    def test_excluded_attribute_name_is_not_reported(self, verbose_level):
+        obj = CustomClass('a', 'a')
+        expected = {'matched_values': (
+            {'root.b': 'a'} if verbose_level == 2 else {'root.b'}
+        )}
+
+        assert DeepSearch(obj, 'a', exclude_paths=['root.a'], verbose_level=verbose_level) == expected
+
+    @pytest.mark.parametrize('verbose_level', [1, 2])
+    def test_excluded_dictionary_value_type_does_not_report_key(self, verbose_level):
+        obj = {'needle': 1, 'needle_keep': 'needle'}
+        matches = {"root['needle_keep']": 'needle'} if verbose_level == 2 else {"root['needle_keep']"}
+        expected = {'matched_paths': matches, 'matched_values': matches}
+
+        assert DeepSearch(obj, 'needle', exclude_types=[int], verbose_level=verbose_level) == expected
+
     def test_skip_type_str(self):
         obj = "long string somewhere"
         result = {}
