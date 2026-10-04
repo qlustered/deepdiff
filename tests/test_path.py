@@ -1,4 +1,5 @@
 import pytest
+from deepdiff import DeepDiff, Delta
 from deepdiff.path import _path_to_elements, GET, GETATTR, extract, parse_path, stringify_path, _add_to_elements
 
 
@@ -74,3 +75,59 @@ def test__add_to_elements(test_num, elem, inside, expected):
     elements = []
     _add_to_elements(elements, elem, inside)
     assert expected == elements
+
+
+@pytest.mark.parametrize('key', [
+    b'',
+    b'foo',
+    b"has'quote",
+    b'has"quote',
+    b"has'both\"quotes",
+    b'back\\slash',
+    b'ending\\',
+    b'ending\\\\',
+    b"slash\\'and\"quotes",
+    b'\xff\x00',
+    b'bracket]dot.',
+])
+@pytest.mark.parametrize('change', ['added', 'removed', 'changed'])
+def test_bytes_key_paths(key, change):
+    old_items = {'same': 0}
+    new_items = {'same': 0}
+    if change != 'added':
+        old_items[key] = 1
+    if change != 'removed':
+        new_items[key] = 2
+    before = {'items': [old_items]}
+    after = {'items': [new_items]}
+    path = f"root['items'][0][{key!r}]"
+
+    diff = DeepDiff(before, after)
+    report_type = 'values_changed' if change == 'changed' else f'dictionary_item_{change}'
+    assert list(diff) == [report_type]
+    assert list(diff[report_type]) == [path]
+    assert parse_path(path) == ['items', 0, key]
+    assert stringify_path(_path_to_elements(path, root_element=None)) == path
+    assert extract(before if change == 'removed' else after, path) == (1 if change == 'removed' else 2)
+
+    delta = Delta(diff, bidirectional=True, raise_errors=True)
+    assert before + delta == after
+    assert after - delta == before
+
+
+@pytest.mark.parametrize('key', [
+    "b'foo'",
+    'b"foo"',
+    r"b'back\slash'",
+    r'back\slash',
+    '*',
+    '**',
+])
+def test_string_key_path_round_trip(key):
+    before = {key: 1}
+    after = {key: 2}
+    diff = DeepDiff(before, after)
+    path, = diff['values_changed']
+    assert parse_path(path) == [key]
+    assert extract(after, path) == 2
+    assert before + Delta(diff, raise_errors=True) == after
