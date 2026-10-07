@@ -292,7 +292,7 @@ class DeepHash(Base):
 
     @staticmethod
     def _get_slots_dict(obj: Any) -> Dict[str, Any]:
-        """Get a dict of initialized slot attributes.
+        """Get a dict of initialized slot attributes across the class hierarchy.
 
         Uses object.__getattribute__ to check each slot directly, bypassing
         __getattr__. For uninitialized slots on classes that define __getattr__,
@@ -300,15 +300,19 @@ class DeepHash(Base):
         """
         result = {}
         has_getattr = hasattr(type(obj), '__getattr__')
-        for slot in obj.__slots__:
-            try:
-                result[slot] = object.__getattribute__(obj, slot)
-            except AttributeError:
-                if has_getattr:
-                    # The slot isn't initialized, but the class defines __getattr__.
-                    # Try the normal getattr to let __getattr__ provide a value or
-                    # raise — if it raises, we propagate to fail the strategy.
-                    result[slot] = getattr(obj, slot)
+        for cls in type(obj).__mro__:
+            slots = cls.__dict__.get('__slots__', ())
+            if isinstance(slots, str):
+                slots = (slots,)
+            for slot in slots:
+                try:
+                    result[slot] = object.__getattribute__(obj, slot)
+                except AttributeError:
+                    if has_getattr:
+                        # The slot isn't initialized, but the class defines __getattr__.
+                        # Try the normal getattr to let __getattr__ provide a value or
+                        # raise — if it raises, we propagate to fail the strategy.
+                        result[slot] = getattr(obj, slot)
         return result
 
     @staticmethod

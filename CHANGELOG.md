@@ -1,6 +1,7 @@
 # DeepDiff Change log
 
 - Unreleased
+    - Fixed DeepHash omitting inherited and string-declared slot attributes, which could hide changes in unordered comparisons of slotted objects.
     - Fixed missing type changes between equal-comparing items inside ordered iterables, e.g. `DeepDiff([2], [2.0])` now reports the `int` → `float` change like `DeepDiff(2, 2.0)` and `DeepDiff({'a': 2}, {'a': 2.0})` already do (issue #605).
 
 - v9-1-0
