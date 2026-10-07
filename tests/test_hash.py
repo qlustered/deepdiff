@@ -299,6 +299,101 @@ class TestDeepHash:
         # Should still not raise AttributeError internally for uninitialized 'z'
         assert result[obj] is not unprocessed
 
+    @pytest.mark.parametrize('derived_slots', [(), ('y', 'uninitialized'), 'value'])
+    @pytest.mark.parametrize('nested', [False, True])
+    def test_inherited_slot_values_affect_hash_and_unordered_diff(self, derived_slots, nested):
+        class Base:
+            __slots__ = ('x',)
+
+            def __init__(self, x):
+                self.x = x
+
+        class Derived(Base):
+            __slots__ = derived_slots
+
+        class Leaf(Derived):
+            __slots__ = ('z',)
+
+        cls = Leaf if nested else Derived
+        old = cls(1)
+        equal = cls(1)
+        new = cls(3)
+        for obj in (old, equal, new):
+            if derived_slots == 'value':
+                obj.value = 2
+            elif derived_slots:
+                obj.y = 2
+            if nested:
+                obj.z = 4
+
+        hashes = DeepHash([old, equal, new])
+        assert hashes[old] == hashes[equal]
+        assert hashes[old] != hashes[new]
+        assert DeepDiff([old], [equal], ignore_order=True) == {}
+        assert DeepDiff([old], [new], ignore_order=True) == {
+            'values_changed': {'root[0].x': {'old_value': 1, 'new_value': 3}}
+        }
+
+    @pytest.mark.parametrize('slots', ['value', {'value': 'Stored value'}])
+    def test_slot_declaration_values_affect_hash(self, slots):
+        class Slotted:
+            __slots__ = slots
+
+            def __init__(self, value):
+                self.value = value
+
+        old = Slotted(1)
+        equal = Slotted(1)
+        new = Slotted(3)
+        hashes = DeepHash([old, equal, new])
+        assert hashes[old] == hashes[equal]
+        assert hashes[old] != hashes[new]
+        assert DeepDiff([old], [new], ignore_order=True) == {
+            'values_changed': {'root[0].value': {'old_value': 1, 'new_value': 3}}
+        }
+
+    @pytest.mark.parametrize('broken', [False, True])
+    def test_inherited_uninitialized_slot_with_getattr(self, broken):
+        class Base:
+            __slots__ = ('x', 'y')
+
+            def __init__(self, x):
+                self.x = x
+
+            def __getattr__(self, name):
+                if name == 'y' and not broken:
+                    return 2
+                raise AttributeError(name)
+
+        class Derived(Base):
+            __slots__ = ()
+
+        old = Derived(1)
+        new = Derived(3)
+        hashes = DeepHash([old, new])
+        if broken:
+            assert hashes[old] is unprocessed
+            assert hashes[new] is unprocessed
+        else:
+            assert hashes[old] != hashes[new]
+
+    def test_inherited_slots_respect_ignored_type_groups(self):
+        class Base:
+            __slots__ = ('x',)
+
+            def __init__(self, x):
+                self.x = x
+
+        class Derived(Base):
+            __slots__ = ()
+
+        old = Base(1)
+        new = Derived(1)
+        options = {'ignore_type_in_groups': [(Base, Derived)]}
+        hashes = DeepHash([old, new], **options)
+        assert hashes[old] == hashes[new]
+        assert DeepDiff([old], [new], ignore_order=True, **options) == {}
+
     def test_slots_deepdiff_comparison(self):
         """Test that DeepDiff also works correctly with __slots__ classes (incl inherited and uninitialized attributes)."""
         class Base:
