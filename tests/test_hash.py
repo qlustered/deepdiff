@@ -6,6 +6,9 @@ import uuid6
 import logging
 import datetime
 import ipaddress
+import pickle
+from copy import deepcopy
+from decimal import Decimal
 from typing import Union
 from pathlib import Path
 from collections import namedtuple
@@ -16,6 +19,7 @@ from deepdiff.deephash import (
     prepare_string_for_hashing, unprocessed,
     UNPROCESSED_KEY, BoolObj, HASH_LOOKUP_ERR_MSG, combine_hashes_lists)
 from deepdiff.helper import pypy3, get_id, number_to_string, np, py_major_version, py_minor_version
+from deepdiff.serialization import pickle_dump, pickle_load
 from tests import CustomClass2
 
 logging.disable(logging.CRITICAL)
@@ -403,6 +407,51 @@ class TestDeepHashPrep:
         result1 = DeepHashPrep(obj1, ignore_numeric_type_changes=True)
         result2 = DeepHashPrep(obj2, ignore_numeric_type_changes=True)
         assert result1[obj1] == result2[obj2]
+
+    @pytest.mark.parametrize('number', [1, 1.0, 1j, Decimal('1'), np.int64(1)])
+    @pytest.mark.parametrize('reverse', [False, True])
+    def test_numeric_cache_key_does_not_collide_with_tuple(self, number, reverse):
+        item = (type(number), number)
+        objects = [item, number] if reverse else [number, item]
+        result = DeepHash(objects)
+        number_hash = DeepHash(number)[number]
+        tuple_hash = DeepHash(item)[item]
+
+        assert result[number] == number_hash
+        assert result[item] == tuple_hash
+        assert result[number] != result[item]
+        assert result.get(item) == tuple_hash
+        assert DeepHash.get_key(result.hashes, number) == number_hash
+        assert DeepHash.get_key(result.hashes, item) == tuple_hash
+        assert number in result
+        assert item in result
+        assert item in set(result.keys())
+        assert dict(result.items())[item] == tuple_hash
+        assert result._get_objects_to_hashes_dict()[item] == tuple_hash
+
+    def test_numeric_cache_does_not_contain_unhashed_tuple(self):
+        result = DeepHash(1)
+        item = (int, 1)
+
+        assert item not in result
+        assert result.get(item) is None
+        with pytest.raises(KeyError):
+            result[item]
+
+    @pytest.mark.parametrize('copy_cache', [
+        deepcopy,
+        pytest.param(lambda value: pickle.loads(pickle.dumps(value)), id='pickle'),
+        pytest.param(lambda value: pickle_load(pickle_dump(value)), id='restricted_pickle'),
+    ])
+    def test_numeric_cache_key_survives_copy(self, copy_cache):
+        original = DeepHash([1, 1.0])
+        hashes = copy_cache(original.hashes)
+
+        for item in [1, 1.0]:
+            assert DeepHash.get_key(hashes, item) == original[item]
+        result = DeepHash((int, 1), hashes=hashes)
+        assert result[1] != result[(int, 1)]
+        assert result[1] != result[1.0]
 
     def test_prep_str_fail_if_deephash_leaks_results(self):
         """

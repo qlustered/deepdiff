@@ -1430,6 +1430,23 @@ class TestIgnoreOrderNumericTypeChange:
         assert result["type_changes"]["root[0]['a']"]["old_type"] is int
         assert result["type_changes"]["root[0]['a']"]["new_type"] is float
 
+    @pytest.mark.parametrize('number', [1, 1.0, 1j])
+    @pytest.mark.parametrize('reverse', [False, True])
+    def test_numeric_cache_key_does_not_hide_tuple_change(self, number, reverse):
+        item = (type(number), number)
+        t1, t2 = ([item], [number]) if reverse else ([number], [item])
+
+        assert DeepDiff(t1, t2, ignore_order=True) == {
+            'type_changes': {
+                'root[0]': {
+                    'old_type': type(t1[0]),
+                    'new_type': type(t2[0]),
+                    'old_value': t1[0],
+                    'new_value': t2[0],
+                },
+            },
+        }
+
     def test_ignore_numeric_type_changes_suppresses_report(self):
         """When ignore_numeric_type_changes=True the type change must be hidden."""
         result = DeepDiff(

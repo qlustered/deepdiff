@@ -1,6 +1,7 @@
 # DeepDiff Change log
 
 - Unreleased
+    - Fixed `DeepHash` numeric cache keys colliding with ordinary tuples such as `(int, 1)`, which could hide differences with `ignore_order=True` (#639). Numeric keys in raw `.hashes` dictionaries now use a private marker; rebuild caches retained from DeepDiff 9.0/9.1 before reusing them through `hashes=`. Public object-based lookup and hash values for ordinary numeric inputs are unchanged.
     - Fixed missing type changes between equal-comparing items inside ordered iterables, e.g. `DeepDiff([2], [2.0])` now reports the `int` → `float` change like `DeepDiff(2, 2.0)` and `DeepDiff({'a': 2}, {'a': 2.0})` already do (issue #605).
 
 - v9-1-0

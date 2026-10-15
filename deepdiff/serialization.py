@@ -91,6 +91,7 @@ SAFE_TO_IMPORT = frozenset({
     'collections.OrderedDict',
     're.Pattern',
     'deepdiff.helper.Opcode',
+    'deepdiff.deephash._NumberHashKey',
     'ipaddress.IPv4Interface',
     'ipaddress.IPv6Interface',
     'ipaddress.IPv4Network',

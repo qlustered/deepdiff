@@ -100,6 +100,10 @@ class BoolObj(Enum):
     FALSE = 0
 
 
+class _NumberHashKey:
+    """Pickle-safe namespace for numeric cache keys, separate from user tuples."""
+
+
 def prepare_string_for_hashing(
         obj: Union[str, bytes, memoryview],
         ignore_string_type_changes: bool = False,
@@ -382,9 +386,9 @@ class DeepHash(Base):
 
     @staticmethod
     def _unwrap_hash_key(key: Any) -> Any:
-        """Unwrap a (type, value) hash key back to the original value for public API."""
-        if isinstance(key, tuple) and len(key) == 2 and isinstance(key[0], type) and isinstance(key[1], only_numbers):
-            return key[1]
+        """Unwrap an internal numeric hash key for the public API."""
+        if isinstance(key, tuple) and len(key) == 3 and key[0] is _NumberHashKey:
+            return key[2]
         return key
 
     def _get_objects_to_hashes_dict(self, extract_index: Optional[int] = 0) -> Dict[Any, Any]:
@@ -619,18 +623,18 @@ class DeepHash(Base):
 
         In Python, 1 == 1.0 and hash(1) == hash(1.0), so int and float values
         collide as dict keys. When ignore_numeric_type_changes is False, we wrap
-        numeric objects as (type, value) tuples so that each type gets its own
-        cache entry and its own hash.
+        numeric objects as (_NumberHashKey, type, value) tuples so that each type
+        gets its own cache entry without colliding with ordinary (type, value) tuples.
         """
         if not self.ignore_numeric_type_changes and isinstance(obj, only_numbers):
-            return (type(obj), obj)
+            return (_NumberHashKey, type(obj), obj)
         return obj
 
     @staticmethod
     def _make_hash_key_for_lookup(obj: Any, ignore_numeric_type_changes: bool = False) -> Any:
         """Static version of _make_hash_key for use in static accessor methods."""
         if not ignore_numeric_type_changes and isinstance(obj, only_numbers):
-            return (type(obj), obj)
+            return (_NumberHashKey, type(obj), obj)
         return obj
 
     def _hash(self, obj: Any, parent: str, parents_ids: frozenset = EMPTY_FROZENSET) -> HashTuple:
