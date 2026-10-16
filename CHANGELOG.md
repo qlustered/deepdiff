@@ -2,6 +2,7 @@
 
 - Unreleased
     - Fixed missing type changes between equal-comparing items inside ordered iterables, e.g. `DeepDiff([2], [2.0])` now reports the `int` → `float` change like `DeepDiff(2, 2.0)` and `DeepDiff({'a': 2}, {'a': 2.0})` already do (issue #605).
+    - Fixed comparison and hashing of fixed-offset `datetime.timezone` objects to use their UTC offsets (#466). DeepHash values for these objects and structures containing them may change.
 
 - v9-1-0
     - Fixed `_dict_from_slots` dropping a parent-declared mangled `__slots__` attribute for a subclass instance, because the name was unmangled using the concrete instance type instead of the declaring class (#506)

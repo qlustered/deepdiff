@@ -1,9 +1,60 @@
 import pytz
-from datetime import date, datetime, time, timezone
+import pytest
+from datetime import date, datetime, time, timedelta, timezone
 from deepdiff import DeepDiff
 
 
 class TestDiffDatetime:
+    @pytest.mark.parametrize('old_offset,new_offset', [
+        (timedelta(), timedelta(hours=1)),
+        (timedelta(hours=1), timedelta(hours=2)),
+        (timedelta(hours=-5), timedelta(hours=5, minutes=30)),
+        (timedelta(microseconds=1), timedelta(microseconds=2)),
+    ])
+    @pytest.mark.parametrize('truncate_datetime', [None, 'day'])
+    def test_timezone_diff(self, old_offset, new_offset, truncate_datetime):
+        old = timezone(old_offset)
+        new = timezone(new_offset)
+
+        assert DeepDiff(old, new, truncate_datetime=truncate_datetime) == {
+            'values_changed': {'root': {'old_value': old, 'new_value': new}}
+        }
+
+    def test_timezone_diff_in_dictionary(self):
+        old = timezone(timedelta(hours=1))
+        new = timezone(timedelta(hours=2))
+
+        assert DeepDiff({'timezone': old}, {'timezone': new}) == {
+            'values_changed': {"root['timezone']": {'old_value': old, 'new_value': new}}
+        }
+
+    @pytest.mark.parametrize('ignore_order', [False, True])
+    def test_timezone_diff_in_list(self, ignore_order):
+        old = timezone(timedelta(hours=1))
+        new = timezone(timedelta(hours=2))
+
+        assert DeepDiff([old], [new], ignore_order=ignore_order) == {
+            'values_changed': {'root[0]': {'old_value': old, 'new_value': new}}
+        }
+
+    def test_timezone_diff_in_set(self):
+        old = timezone(timedelta(hours=1))
+        new = timezone(timedelta(hours=2))
+
+        assert DeepDiff({old}, {new}) == {
+            'set_item_removed': {f'root[{old}]'},
+            'set_item_added': {f'root[{new}]'},
+        }
+
+    @pytest.mark.parametrize('offset', [timedelta(), timedelta(hours=1), timedelta(hours=-5)])
+    def test_timezone_equal_offsets_different_names(self, offset):
+        old = timezone(offset)
+        new = timezone(offset, 'custom name')
+
+        assert DeepDiff(old, new) == {}
+        assert DeepDiff([old], [new], ignore_order=True) == {}
+        assert DeepDiff({old}, {new}) == {}
+
     def test_datetime_diff(self):
         """Testing for the correct setting and usage of epsilon."""
         d1 = {"a": datetime(2023, 7, 5, 10, 11, 12)}

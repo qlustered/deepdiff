@@ -2187,6 +2187,10 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
         elif isinstance(level.t1, datetime.datetime):
             self._diff_datetime(level, local_tree=local_tree)
 
+        elif isinstance(level.t1, datetime.timezone):
+            if level.t1 != level.t2:
+                self._report_result('values_changed', level, local_tree=local_tree)
+
         elif isinstance(level.t1, ipranges):
             self._diff_ipranges(level, local_tree=local_tree)
 
