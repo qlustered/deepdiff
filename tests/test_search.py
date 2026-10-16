@@ -260,6 +260,21 @@ class TestDeepSearch:
         ds = DeepSearch(obj, item, verbose_level=1, exclude_types=[str])
         assert ds == result
 
+    @pytest.mark.parametrize('obj', [[item], (item,), {'key': item}, CustomClass(item)])
+    def test_skip_root_object_type(self, obj):
+        assert DeepSearch(obj, item, exclude_types=[type(obj)]) == {}
+
+    @pytest.mark.parametrize('excluded', [[item], (item,), CustomClass(item)])
+    def test_skip_dictionary_value_type(self, excluded):
+        obj = {'skip': excluded, 'keep': item}
+        result = {'matched_values': {"root['keep']"}}
+        assert DeepSearch(obj, item, exclude_types=[type(excluded)]) == result
+
+    def test_excluding_item_type_does_not_skip_other_object_types(self):
+        obj = {'needle': 1, 'value': 'needle'}
+        result = {'matched_paths': {"root['needle']"}}
+        assert DeepSearch(obj, 'needle', exclude_types=[str]) == result
+
     def test_skip_regexp(self):
         obj = [{'a': 1, 'b': "somewhere"}, {'c': 4, 'b': "somewhere"}]
         ds = DeepSearch(obj, item, exclude_regex_paths=[r"root\[\d+\]"])
