@@ -475,7 +475,8 @@ def number_to_string(number: Any, significant_digits: int, number_format_notatio
     except KeyError:
         raise ValueError("number_format_notation got invalid value of {}. The valid values are 'f' and 'e'".format(number_format_notation)) from None
 
-    if not isinstance(number, numbers):  # type: ignore
+    # datetimes are in `numbers` for type grouping but can't be rounded
+    if not isinstance(number, only_numbers):  # type: ignore
         return number
     elif isinstance(number, Decimal):
         with localcontext() as ctx:
