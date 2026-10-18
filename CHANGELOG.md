@@ -2,6 +2,7 @@
 
 - Unreleased
     - Fixed missing type changes between equal-comparing items inside ordered iterables, e.g. `DeepDiff([2], [2.0])` now reports the `int` → `float` change like `DeepDiff(2, 2.0)` and `DeepDiff({'a': 2}, {'a': 2.0})` already do (issue #605).
+    - Fixed `exclude_regex_paths` being ignored by the `threshold_to_diff_deeper` shortcut, so a dict whose differing keys are all regex-excluded is no longer reported as a whole `values_changed` (issue #487).
 
 - v9-1-0
     - Fixed `_dict_from_slots` dropping a parent-declared mangled `__slots__` attribute for a subclass instance, because the name was unmangled using the concrete instance type instead of the declaring class (#506)

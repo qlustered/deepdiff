@@ -760,16 +760,34 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
         t_keys_removed = t1_keys - t_keys_intersect
 
         if self.threshold_to_diff_deeper:
-            if self.exclude_paths or self.exclude_glob_paths:
-                t_keys_union = {f"{level.path()}[{repr(key)}]" for key in (t2_keys | t1_keys)}
+            t_keys_union_len = len(t2_keys | t1_keys)
+            if (
+                (self.exclude_paths or self.exclude_glob_paths or self.exclude_regex_paths)
+                and t_keys_union_len > 1
+                and len(t_keys_intersect) / t_keys_union_len < self.threshold_to_diff_deeper
+            ):
+                t_keys_union = set()
+                for key in t2_keys | t1_keys:
+                    if self.exclude_regex_paths and not (self.include_paths or self.include_glob_paths):
+                        # Match the child path without invoking object callbacks before traversal.
+                        if key in t_keys_added and t2_clean_to_keys:
+                            path_key = t2_clean_to_keys[key]
+                        elif key in t_keys_removed and t1_clean_to_keys:
+                            path_key = t1_clean_to_keys[key]
+                        else:
+                            path_key = key
+                        child_path = level.branch_deeper(
+                            None, None, rel_class, path_key, path_key).path()
+                        if child_path is not None and any(
+                                pattern.search(child_path) for pattern in self.exclude_regex_paths):
+                            continue
+                    t_keys_union.add(f"{level.path()}[{repr(key)}]")
                 if self.exclude_paths:
                     t_keys_union -= self.exclude_paths
                 if self.exclude_glob_paths:
                     t_keys_union = {k for k in t_keys_union
                                     if not any(gp.match(k) for gp in self.exclude_glob_paths)}
                 t_keys_union_len = len(t_keys_union)
-            else:
-                t_keys_union_len = len(t2_keys | t1_keys)
             if t_keys_union_len > 1 and len(t_keys_intersect) / t_keys_union_len < self.threshold_to_diff_deeper:
                 self._report_result('values_changed', level, local_tree=local_tree)
                 return
