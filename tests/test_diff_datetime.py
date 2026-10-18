@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 import pytz
 from datetime import date, datetime, time, timedelta, timezone
-from deepdiff import DeepDiff
+from deepdiff import DeepDiff, DeepHash
 
 
 class TestDiffDatetime:
@@ -125,6 +125,13 @@ class TestDiffDatetime:
         assert not DeepDiff(d1, d2)
         assert not DeepDiff(d1, d2, ignore_order=True)
         assert not DeepDiff(d1, d2, truncate_datetime='second')
+
+    def test_temporal_values_with_significant_digits(self):
+        assert DeepHash(timedelta(seconds=1), significant_digits=2)[timedelta(seconds=1)]
+        assert not DeepDiff([timedelta(1)], [timedelta(1)], ignore_order=True, ignore_numeric_type_changes=True)
+        diff = DeepDiff(np.datetime64("2020-01-01"), np.datetime64("2020-01-02"), significant_digits=2)
+        assert diff == {"values_changed": {"root": {
+            "new_value": np.datetime64("2020-01-02"), "old_value": np.datetime64("2020-01-01")}}}
 
 
 class TestTemporalDictionaryKeys:
