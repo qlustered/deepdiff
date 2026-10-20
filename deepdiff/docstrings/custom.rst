@@ -211,22 +211,37 @@ Base Operator Plus
         @abstractmethod
         def normalize_value_for_hashing(self, parent: Any, obj: Any) -> Any:
             """
-            You can use this function to normalize values for ignore_order=True
+            Normalize an individual value before hashing, for example with ignore_order=True.
 
-            For example, you may want to turn all the words to be lowercase. Then you return obj.lower()
+            Unlike give_up_diffing, this method is not gated by match: hashing has no
+            pair of values to compare. Check obj's type or parent path here and return
+            obj unchanged when no normalization applies.
+
+            For case-insensitive strings, return obj.lower() if isinstance(obj, str) else obj.
             """
             pass
 
 
+``match`` selects an operator for comparing a pair of values. It does **not**
+select which values are passed to ``normalize_value_for_hashing``. Hashing
+processes individual values before DeepDiff can pair them for comparison, and
+calls each registered operator's normalization method in order. Each method
+receives the preceding method's result.
+
+A normalizer must therefore check the type of ``obj`` (or its ``parent`` path)
+itself, and return ``obj`` unchanged for values it does not handle. This includes
+containers as well as their contents. An empty implementation using ``pass``
+returns ``None``; doing that for unrelated values can give them the same hash
+and hide differences when ``ignore_order=True``.
+
 **Example 1: We don't care about the exact GUID values. As long as pairs of strings match GUID regex, we want them to be considered as equals**
 
     >>> import re
-    ... from typing import Any
-    ... from deepdiff import DeepDiff
-    ... from deepdiff.operator import BaseOperatorPlus
-    ...
-    ...
-    ... d1 = {
+    >>> from typing import Any
+    >>> from deepdiff import DeepDiff
+    >>> from deepdiff.operator import BaseOperatorPlus
+
+    >>> d1 = {
     ...     "Name": "SUB_OBJECT_FILES",
     ...     "Values": {
     ...         "Value": [
@@ -236,8 +251,8 @@ Base Operator Plus
     ...         ]
     ...     }
     ... }
-    ...
-    ... d2 = {
+
+    >>> d2 = {
     ...     "Name": "SUB_OBJECT_FILES",
     ...     "Values": {
     ...         "Value": [
@@ -247,9 +262,8 @@ Base Operator Plus
     ...         ]
     ...     }
     ... }
-    ...
-    ...
-    ... class RemoveGUIDsOperator(BaseOperatorPlus):
+
+    >>> class RemoveGUIDsOperator(BaseOperatorPlus):
     ...     _pattern = r"[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
     ...     _substitute = "guid"
     ...
@@ -272,15 +286,22 @@ Base Operator Plus
     ...         if isinstance(obj, str):
     ...             return self._remove_pattern(obj)
     ...         return obj
-    ...
-    ...
-    ... operator = RemoveGUIDsOperator()
-    ...
+
+    >>> operator = RemoveGUIDsOperator()
+
     >>> diff1 = DeepDiff(d1, d2, custom_operators=[operator], log_stacktrace=True)
-    ... diff1
+    >>> diff1
     {}
     >>> diff2 = DeepDiff(d1, d2, ignore_order=True, custom_operators=[operator], log_stacktrace=True)
-    ... diff2
+    >>> diff2
+    {}
+
+The normalizer above returns non-string values unchanged, so registering the
+string operator does not hide differences between numbers:
+
+    >>> bool(DeepDiff([1, 2], [2, 3], ignore_order=True, custom_operators=[operator]))
+    True
+    >>> DeepDiff([1, 2], [2, 1], ignore_order=True, custom_operators=[operator])
     {}
 
 
