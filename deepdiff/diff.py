@@ -813,13 +813,15 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
                 continue
             parents_ids_added = add_to_frozen_set(parents_ids, item_id)
 
+            # Case normalization is for matching, not for paths into the input objects.
+            preserve_case = self.ignore_string_case and isinstance(key1, str) and isinstance(key2, str)
             # Go one level deeper
             next_level = level.branch_deeper(
                 t1[key1],
                 t2[key2],
                 child_relationship_class=rel_class,
-                child_relationship_param=key,
-                child_relationship_param2=key,
+                child_relationship_param=key1 if preserve_case else key,
+                child_relationship_param2=key2 if preserve_case else key,
                 )
             self._diff(next_level, parents_ids_added, local_tree=local_tree)
 
