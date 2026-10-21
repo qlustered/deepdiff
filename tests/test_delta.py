@@ -28,6 +28,19 @@ from tests import PicklableClass, parameterize_cases, CustomClass, CustomClass2
 
 class TestBasicsOfDelta:
 
+    @pytest.mark.parametrize('new_value', [2, 'two'])
+    def test_ignore_case_delta_uses_original_paths_in_both_directions(self, new_value):
+        t1 = {'User': {'AboutMe': 1}}
+        t2 = {'user': {'aboutme': new_value}}
+        diff = DeepDiff(t1, t2, ignore_string_case=True)
+        delta = Delta(diff, bidirectional=True, raise_errors=True)
+
+        # Ignored casing differences do not rename keys in either input.
+        assert t1 + delta == {'User': {'AboutMe': new_value}}
+        assert t2 - delta == {'user': {'aboutme': 1}}
+        assert t1 == {'User': {'AboutMe': 1}}
+        assert t2 == {'user': {'aboutme': new_value}}
+
     def test_from_null_delta_json(self):
         t1 = None
         t2 = [1, 2, 3, 5]

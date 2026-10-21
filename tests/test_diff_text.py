@@ -390,6 +390,20 @@ class TestDeepDiffText:
             path = r"root\['User'\]\['AboutMe'\]$"
         assert not DeepDiff(t1, t2, ignore_string_case=True, **{path_option: [path]})
 
+    @pytest.mark.parametrize('new_value,change_type', [(2, 'values_changed'), ('two', 'type_changes')])
+    def test_ignore_case_verbose_paths_use_each_dictionary_spelling(self, new_value, change_type):
+        t1 = {'User': {'AboutMe': 1}}
+        t2 = {'user': {'aboutme': new_value}}
+        diff = DeepDiff(t1, t2, ignore_string_case=True, verbose_level=2)
+        expected = {
+            'old_value': 1,
+            'new_value': new_value,
+            'new_path': "root['user']['aboutme']",
+        }
+        if change_type == 'type_changes':
+            expected.update(old_type=int, new_type=str)
+        assert diff == {change_type: {"root['User']['AboutMe']": expected}}
+
     def test_ignore_case_preserves_paths_for_nested_additions_and_removals(self):
         t1 = {'User': {'Keep': 1, 'Removed': 2}}
         t2 = {'user': {'keep': 1, 'Added': 3}}

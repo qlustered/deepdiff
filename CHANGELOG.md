@@ -1,7 +1,7 @@
 # DeepDiff Change log
 
 - Unreleased
-    - Preserve original string key casing in reported paths when `ignore_string_case=True`, so path exclusions can use the input keys (#515).
+    - Preserve original string key casing in paths for matched dictionary keys when `ignore_string_case=True` (#515). `verbose_level=2` and Delta include the second input's spelling in `new_path` for value and type changes. Forward and reverse Delta application use the respective input paths without renaming keys whose casing is ignored. Exact and regex exclusions can use the original paths when comparison reaches those keys; the existing `threshold_to_diff_deeper` shortcut is unchanged. Numeric and bytes key normalization is unchanged.
     - Fixed missing type changes between equal-comparing items inside ordered iterables, e.g. `DeepDiff([2], [2.0])` now reports the `int` → `float` change like `DeepDiff(2, 2.0)` and `DeepDiff({'a': 2}, {'a': 2.0})` already do (issue #605).
 
 - v9-1-0
