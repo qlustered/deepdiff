@@ -158,6 +158,33 @@ Example with Fraction:
     math_epsilon cannot currently handle the hashing of values, which is done when :ref:`ignore_order_label` is True.
 
 
+.. _math_rel_epsilon_label:
+
+Math Relative Epsilon
+---------------------
+
+math_rel_epsilon: Decimal, default = None
+    math_rel_epsilon is the relative counterpart of :ref:`math_epsilon_label`. It is passed to Python's built in math.isclose() as rel_tol. Two numbers are considered the same if their difference is no more than math_rel_epsilon times the larger of their absolute values. This is useful when the values being compared span different orders of magnitude and a single absolute tolerance does not fit all of them.
+
+    >>> from deepdiff import DeepDiff
+    >>> d1 = {"small": 0.001, "big": 1000000}
+    >>> d2 = {"small": 0.00101, "big": 1010000}
+    >>> DeepDiff(d1, d2, math_rel_epsilon=0.02)
+    {}
+    >>> DeepDiff(d1, d2, math_rel_epsilon=0.001)
+    {'values_changed': {"root['small']": {'new_value': 0.00101, 'old_value': 0.001}, "root['big']": {'new_value': 1010000, 'old_value': 1000000}}}
+
+    math_rel_epsilon and math_epsilon can be used together. Just like math.isclose(), the numbers are considered the same if they are within either tolerance. When only math_rel_epsilon is set, no absolute tolerance is applied, so a non-zero number is never considered close to zero. Set math_epsilon as well if you need that.
+
+    >>> DeepDiff(0.0, 1e-12, math_rel_epsilon=0.01)
+    {'values_changed': {'root': {'new_value': 1e-12, 'old_value': 0.0}}}
+    >>> DeepDiff(0.0, 1e-12, math_rel_epsilon=0.01, math_epsilon=1e-9)
+    {}
+
+.. note::
+    Like math_epsilon, math_rel_epsilon cannot currently handle the hashing of values, which is done when :ref:`ignore_order_label` is True.
+
+
 .. _use_log_scale_label:
 
 Use Log Scale

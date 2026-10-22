@@ -191,6 +191,7 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
                  log_scale_similarity_threshold: float=0.1,
                  log_stacktrace: bool=False,
                  math_epsilon: Optional[float]=None,
+                 math_rel_epsilon: Optional[float]=None,
                  max_diffs: Optional[int]=None,
                  max_passes: int=10000000,
                  multiprocessing: bool=False,
@@ -226,7 +227,7 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
                 "view, hasher, hashes, max_passes, max_diffs, zip_ordered_iterables, "
                 "cutoff_distance_for_pairs, cutoff_intersection_for_pairs, log_frequency_in_sec, cache_size, "
                 "cache_tuning_sample_size, get_deep_distance, group_by, group_by_sort_key, cache_purge_level, log_stacktrace,"
-                "math_epsilon, iterable_compare_func, use_enum_value, _original_type, threshold_to_diff_deeper, default_timezone "
+                "math_epsilon, math_rel_epsilon, iterable_compare_func, use_enum_value, _original_type, threshold_to_diff_deeper, default_timezone "
                 "ignore_order_func, custom_operators, encodings, ignore_encoding_errors, use_log_scale, log_scale_similarity_threshold "
                 "multiprocessing, multiprocessing_workers, multiprocessing_threshold, "
                 "_parameters and _shared_parameters.") % ', '.join(kwargs.keys()))
@@ -301,8 +302,9 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
 
             self.significant_digits = self.get_significant_digits(significant_digits, ignore_numeric_type_changes)
             self.math_epsilon = math_epsilon
-            if self.math_epsilon is not None and self.ignore_order:
-                logger.warning("math_epsilon in conjunction with ignore_order=True is only used for flat object comparisons. Custom math_epsilon will not have an effect when comparing nested objects.")
+            self.math_rel_epsilon = math_rel_epsilon
+            if (self.math_epsilon is not None or self.math_rel_epsilon is not None) and self.ignore_order:
+                logger.warning("math_epsilon and math_rel_epsilon in conjunction with ignore_order=True are only used for flat object comparisons. Custom math_epsilon and math_rel_epsilon will not have an effect when comparing nested objects.")
             self.truncate_datetime = get_truncate_datetime(truncate_datetime)
             self.number_format_notation = number_format_notation
             if verbose_level in {0, 1, 2}:
@@ -1927,8 +1929,13 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
         if self.use_log_scale:
             if not logarithmic_similarity(level.t1, level.t2, threshold=self.log_scale_similarity_threshold):
                 self._report_result('values_changed', level, local_tree=local_tree)
-        elif self.math_epsilon is not None:
-            if not is_close(level.t1, level.t2, abs_tol=self.math_epsilon):
+        elif self.math_epsilon is not None or self.math_rel_epsilon is not None:
+            tolerances = {}
+            if self.math_epsilon is not None:
+                tolerances['abs_tol'] = self.math_epsilon
+            if self.math_rel_epsilon is not None:
+                tolerances['rel_tol'] = self.math_rel_epsilon
+            if not is_close(level.t1, level.t2, **tolerances):
                 self._report_result('values_changed', level, local_tree=local_tree)
         elif self.significant_digits is None:
             if level.t1 != level.t2:

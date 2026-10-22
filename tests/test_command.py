@@ -89,6 +89,18 @@ class TestCommands:
         assert 0 == diffed2.exit_code
         assert '{\n  "values_changed": {\n    "root[2][2]": {\n      "new_value": 0.289,\n      "old_value": 0.288\n    }\n  }\n}\n' == diffed2.output
 
+    def test_command_math_rel_epsilon(self):
+        t1 = os.path.join(FIXTURES_DIR, 'd_t1.yaml')
+        t2 = os.path.join(FIXTURES_DIR, 'd_t2.yaml')
+        runner = CliRunner()
+        diffed = runner.invoke(diff, [t1, t2, '--math-rel-epsilon', '0.01'])
+        assert 0 == diffed.exit_code
+        assert '{}\n' == diffed.output
+
+        diffed2 = runner.invoke(diff, [t1, t2, '--math-rel-epsilon', '0.001'])
+        assert 0 == diffed2.exit_code
+        assert '{\n  "values_changed": {\n    "root[2][2]": {\n      "new_value": 0.289,\n      "old_value": 0.288\n    }\n  }\n}\n' == diffed2.output
+
     def test_command_grep(self):
         path = os.path.join(FIXTURES_DIR, 'd_t1.yaml')
         runner = CliRunner()

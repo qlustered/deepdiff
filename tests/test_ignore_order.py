@@ -1005,6 +1005,15 @@ class TestIgnoreOrder:
         expected = {'values_changed': {'root[0]': {'new_value': {'x': 0.0011}, 'old_value': {'x': 0.001}}, 'root[1]': {'new_value': {'y': 2}, 'old_value': {'y': 2.00002}}}}
         assert expected == diff
 
+    def test_math_rel_epsilon_when_ignore_order_in_list(self):
+        a = [1000.0, 2]
+        b = [2, 1001.0]
+        diff = DeepDiff(a, b, ignore_order=True)
+        assert {'values_changed': {'root[0]': {'new_value': 1001.0, 'old_value': 1000.0}}} == diff
+
+        diff2 = DeepDiff(a, b, ignore_order=True, math_rel_epsilon=0.01)
+        assert {} == diff2
+
     def test_datetime_and_ignore_order(self):
         diff = DeepDiff(
             [{'due_date': datetime.date(2024, 2, 1)}],

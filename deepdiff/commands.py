@@ -35,6 +35,7 @@ def cli():
 @click.option('--exclude-paths', required=False, type=str, show_default=False, multiple=True)
 @click.option('--exclude-regex-paths', required=False, type=str, show_default=False, multiple=True)
 @click.option('--math-epsilon', required=False, type=Decimal, show_default=False)
+@click.option('--math-rel-epsilon', required=False, type=Decimal, show_default=False)
 @click.option('--get-deep-distance', is_flag=True, show_default=True)
 @click.option('--group-by', required=False, type=str, show_default=False, multiple=False)
 @click.option('--ignore-order', is_flag=True, show_default=True)

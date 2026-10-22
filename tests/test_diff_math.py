@@ -1,4 +1,5 @@
 from decimal import Decimal
+from unittest import mock
 from deepdiff import DeepDiff
 
 
@@ -124,3 +125,66 @@ class TestDiffMath:
         # This should not crash and should treat 1 and 1.0 as the same key
         result = DeepDiff(d1, d2, ignore_numeric_type_changes=True, significant_digits=None)
         assert result == {}
+
+    def test_math_rel_diff(self):
+        """math_rel_epsilon scales the tolerance with the magnitude of the numbers."""
+        d1 = {"small": 0.001, "big": 1000000}
+        d2 = {"small": 0.00101, "big": 1010000}
+        res = DeepDiff(d1, d2, math_rel_epsilon=0.02)
+        assert res == {}
+        # The same absolute tolerance can't cover both values.
+        res = DeepDiff(d1, d2, math_epsilon=0.02)
+        assert res == {"values_changed": {"root['big']": {"new_value": 1010000, "old_value": 1000000}}}
+        res = DeepDiff(d1, d2, math_rel_epsilon=0.001)
+        expected = {
+            "values_changed": {
+                "root['small']": {"new_value": 0.00101, "old_value": 0.001},
+                "root['big']": {"new_value": 1010000, "old_value": 1000000},
+            }
+        }
+        assert res == expected
+
+    def test_math_rel_diff_decimal(self):
+        d1 = {"a": Decimal("7.175")}
+        d2 = {"a": Decimal("7.174")}
+        res = DeepDiff(d1, d2, math_rel_epsilon=0.001)
+        assert res == {}
+        res = DeepDiff(d1, d2, math_rel_epsilon=0.0001)
+        expected = {
+            "values_changed": {
+                "root['a']": {
+                    "new_value": Decimal("7.174"),
+                    "old_value": Decimal("7.175"),
+                }
+            }
+        }
+        assert res == expected
+
+    def test_math_rel_diff_near_zero(self):
+        """A relative tolerance alone never considers a non-zero number close to zero."""
+        res = DeepDiff(0.0, 1e-12, math_rel_epsilon=0.01)
+        assert res == {"values_changed": {"root": {"new_value": 1e-12, "old_value": 0.0}}}
+        res = DeepDiff(0.0, 1e-12, math_rel_epsilon=0.01, math_epsilon=1e-9)
+        assert res == {}
+
+    def test_math_rel_and_abs_diff(self):
+        """Numbers are the same if they are within either tolerance, like math.isclose."""
+        d1 = [0.001, 1000]
+        d2 = [0.002, 1001]
+        res = DeepDiff(d1, d2, math_epsilon=0.01, math_rel_epsilon=0.01)
+        assert res == {}
+        res = DeepDiff(d1, d2, math_epsilon=0.01)
+        assert res == {"values_changed": {"root[1]": {"new_value": 1001, "old_value": 1000}}}
+        res = DeepDiff(d1, d2, math_rel_epsilon=0.01)
+        assert res == {"values_changed": {"root[0]": {"new_value": 0.002, "old_value": 0.001}}}
+
+    @mock.patch('deepdiff.diff.logger')
+    def test_math_rel_diff_ignore_order_warning(self, mock_logger):
+        d1 = {"a": [Decimal("9.709999618320632"), Decimal("9.709999618320632")]}
+        d2 = {"a": [Decimal("9.710000038146973"), Decimal("9.709999618320632")]}
+        res = DeepDiff(d1, d2, ignore_order=True, math_rel_epsilon=0.0001)
+        expected = {
+            "iterable_item_added": {"root['a'][0]": Decimal("9.710000038146973")}
+        }
+        assert res == expected
+        assert "math_rel_epsilon will not have an effect when comparing nested objects" in mock_logger.warning.call_args[0][0]

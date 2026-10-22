@@ -180,6 +180,9 @@ max_diffs: Integer, default = None
 math_epsilon: Decimal, default = None
     :ref:`math_epsilon_label` uses Python's built in Math.isclose. It defines a tolerance value which is passed to math.isclose(). Any numbers that are within the tolerance will not report as being different. Any numbers outside of that tolerance will show up as different.
 
+math_rel_epsilon: Decimal, default = None
+    :ref:`math_rel_epsilon_label` is the relative counterpart of math_epsilon. It is passed to math.isclose() as rel_tol. Any numbers whose difference is within that fraction of the larger of the two magnitudes will not report as being different. It can be combined with math_epsilon.
+
 number_format_notation : string, default="f"
     :ref:`number_format_notation_label` is what defines the meaning of significant digits. The default value of "f" means the digits AFTER the decimal point. "f" stands for fixed point. The other option is "e" which stands for exponent notation or scientific notation.
 
