@@ -133,6 +133,12 @@ if you are considering whether they are fruits or not.
 
 In that case, you can pass a *custom_operators* for the job.
 
+DeepDiff checks whether a comparison is excluded before calling custom operators'
+``match()`` and ``give_up_diffing()`` methods. These methods are not called for excluded
+objects. With ``include_paths``, operators can still be called for the root and ancestors
+of an included path, as well as the included subtree. Operators can also inspect identical
+objects on included paths.
+
 Custom operators give you a lot of power. In the following examples, we explore various use cases such as:
 
 - Making DeepDiff report the L2 Distance of items
