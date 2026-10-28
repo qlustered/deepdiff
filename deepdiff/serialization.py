@@ -16,11 +16,8 @@ import ipaddress
 import base64
 from copy import deepcopy, copy
 from functools import partial
-from collections.abc import Mapping, KeysView
-from typing import (
-    Callable, Optional, Union,
-    overload, Literal, Any,
-)
+from collections.abc import Callable, Mapping, KeysView
+from typing import IO, TYPE_CHECKING, Any, Literal, cast, overload
 from deepdiff.helper import (
     strings,
     get_type,
@@ -38,20 +35,24 @@ from deepdiff.helper import (
     NotPresent,
     ipranges,
 )
-from deepdiff.model import DeltaResult
+from deepdiff.model import DiffLevel, DeltaResult
 
 try:
     import orjson
 except ImportError:  # pragma: no cover.
     orjson = None
 
-logger = logging.getLogger(__name__)
+if TYPE_CHECKING:
+    from types import NoneType
+    from _typeshed import SupportsWrite
+
+logger: logging.Logger = logging.getLogger(__name__)
 
 class UnsupportedFormatErr(TypeError):
     pass
 
 
-NONE_TYPE = type(None)
+NONE_TYPE: type = type(None)
 
 CSV_HEADER_MAX_CHUNK_SIZE = 2048  # The chunk needs to be big enough that covers a couple of rows of data.
 
@@ -149,7 +150,7 @@ class ForbiddenModule(ImportError):
 
 class SerializationMixin:
 
-    def to_json_pickle(self):
+    def to_json_pickle(self) -> str | Any:
         """
         :ref:`to_json_pickle_label`
         Get the json pickle of the diff object. Unless you need all the attributes and functionality of DeepDiff, running to_json() is the safer option that json pickle.
@@ -160,9 +161,10 @@ class SerializationMixin:
             return jsonpickle.encode(copied)
         except ImportError:  # pragma: no cover. Json pickle is getting deprecated.
             logger.error('jsonpickle library needs to be installed in order to run to_json_pickle')  # pragma: no cover. Json pickle is getting deprecated.
+            return None
 
     @classmethod
-    def from_json_pickle(cls, value):
+    def from_json_pickle(cls, value: str) -> Any:
         """
         :ref:`from_json_pickle_label`
         Load DeepDiff object with all the bells and whistles from the json pickle dump.
@@ -174,7 +176,7 @@ class SerializationMixin:
         except ImportError:  # pragma: no cover. Json pickle is getting deprecated.
             logger.error('jsonpickle library needs to be installed in order to run from_json_pickle')  # pragma: no cover. Json pickle is getting deprecated.
 
-    def to_json(self, default_mapping: Optional[dict]=None, force_use_builtin_json=False, verbose_level: Optional[int]=None, **kwargs):
+    def to_json(self, default_mapping: dict | None=None, force_use_builtin_json: bool=False, verbose_level: int | None=None, **kwargs: Any) -> str:
         """
         Dump json of the text view.
         **Parameters**
@@ -221,7 +223,7 @@ class SerializationMixin:
             **kwargs,
         )
 
-    def to_dict(self, verbose_level: Optional[int]=None) -> dict:
+    def to_dict(self, verbose_level: int | None=None) -> dict:
         """
         Convert the result to a python dictionary.
 
@@ -316,7 +318,7 @@ class SerializationMixin:
 
         return deepcopy(dict(result))
 
-    def pretty(self, prefix: Optional[Union[str, Callable]]=None):
+    def pretty(self, prefix: str | Callable | None=None) -> str:
         """
         The pretty human readable string output for the diff object
         regardless of what view was used to generate the diff.
@@ -417,6 +419,10 @@ class _RestrictedPickler(pickle.Pickler):
         return None
 
 
+@overload
+def pickle_dump(obj: object, file_obj: None=None, protocol: int=4) -> bytes: ...
+@overload
+def pickle_dump(obj: object, file_obj: "SupportsWrite[bytes]", protocol: int=4) -> None: ...
 def pickle_dump(obj, file_obj=None, protocol=4):
     """
     **pickle_dump**
@@ -437,17 +443,17 @@ def pickle_dump(obj, file_obj=None, protocol=4):
     file_obj = file_obj or io.BytesIO()
     _RestrictedPickler(file_obj, protocol=protocol, fix_imports=False).dump(obj)
     if not file_obj_passed:
-        return file_obj.getvalue()
+        return cast(io.BytesIO, file_obj).getvalue()
 
 
-def pickle_load(content=None, file_obj=None, safe_to_import=None):
+def pickle_load(content: bytes | str | None=None, file_obj: IO[bytes] | None=None, safe_to_import: Any | None=None) -> Any:
     """
     **pickle_load**
     Load the pickled content. content should be a bytes object.
 
     **Parameters**
 
-    content : Bytes of pickled object. 
+    content : Bytes of pickled object.
 
     file_obj : A file object to load the content from
 
@@ -469,7 +475,7 @@ def pickle_load(content=None, file_obj=None, safe_to_import=None):
 
     """
     if not content and not file_obj:
-        raise ValueError('Please either pass the content or the file_obj to pickle_load.') 
+        raise ValueError('Please either pass the content or the file_obj to pickle_load.')
     if isinstance(content, str):
         content = content.encode('utf-8')
     if content:
@@ -477,7 +483,7 @@ def pickle_load(content=None, file_obj=None, safe_to_import=None):
     return _RestrictedUnpickler(file_obj, safe_to_import=safe_to_import).load()
 
 
-def _get_pretty_form_text(verbose_level):
+def _get_pretty_form_text(verbose_level: int) -> dict[str, str]:
     pretty_form_texts = {
         "type_changes": "Type of {diff_path} changed from {type_t1} to {type_t2} and value changed from {val_t1} to {val_t2}.",
         "values_changed": "Value of {diff_path} changed from {val_t1} to {val_t2}.",
@@ -505,7 +511,7 @@ def _get_pretty_form_text(verbose_level):
     return pretty_form_texts
 
 
-def pretty_print_diff(diff):
+def pretty_print_diff(diff: DiffLevel) -> str:
     type_t1 = get_type(diff.t1).__name__
     type_t2 = get_type(diff.t2).__name__
 
@@ -513,7 +519,7 @@ def pretty_print_diff(diff):
     val_t2 = '"{}"'.format(str(diff.t2)) if type_t2 == "str" else str(diff.t2)
 
     diff_path = diff.path(root='root')
-    return _get_pretty_form_text(diff.verbose_level).get(diff.report_type, "").format(
+    return _get_pretty_form_text(diff.verbose_level).get(cast(str, diff.report_type), "").format(
         diff_path=diff_path,
         type_t1=type_t1,
         type_t2=type_t2,
@@ -521,7 +527,7 @@ def pretty_print_diff(diff):
         val_t2=val_t2)
 
 
-def load_path_content(path, file_type=None):
+def load_path_content(path: str, file_type: str | None=None) -> Any:
     """
     Loads and deserializes the content of the path.
     """
@@ -581,7 +587,7 @@ def load_path_content(path, file_type=None):
     return content
 
 
-def save_content_to_path(content, path, file_type=None, keep_backup=True):
+def save_content_to_path(content: object, path: str, file_type: str | None=None, keep_backup: bool=True) -> None:
     """
     Saves and serializes the content of the path.
     """
@@ -673,7 +679,7 @@ def _serialize_bytes(value):
         return base64.b64encode(value).decode('ascii')
 
 
-JSON_CONVERTOR = {
+JSON_CONVERTOR: dict[Any, Any] = {
     decimal.Decimal: _serialize_decimal,
     fractions.Fraction: _serialize_fraction,
     SetOrdered: list,
@@ -700,7 +706,7 @@ if PydanticBaseModel is not pydantic_base_model_type:
     JSON_CONVERTOR[PydanticBaseModel] = lambda x: x.model_dump()
 
 
-def json_convertor_default(default_mapping=None):
+def json_convertor_default(default_mapping: Mapping[Any, Any] | None=None) -> Callable[[Any], Any]:
     if default_mapping:
         _convertor_mapping = JSON_CONVERTOR.copy()
         _convertor_mapping.update(default_mapping)
@@ -747,48 +753,16 @@ def json_convertor_default(default_mapping=None):
 
 class JSONDecoder(json.JSONDecoder):
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         json.JSONDecoder.__init__(self, object_hook=self.object_hook, *args, **kwargs)
 
-    def object_hook(self, obj):  # type: ignore
+    def object_hook(self, obj: dict[str, Any]) -> dict[str, Any]:
         if 'old_type' in obj and 'new_type' in obj:
             for type_key in ('old_type', 'new_type'):
                 type_str = obj[type_key]
                 obj[type_key] = TYPE_STR_TO_TYPE.get(type_str, type_str)
 
         return obj
-
-
-
-@overload
-def json_dumps(
-    item: Any,
-    **kwargs,
-) -> str:
-    ...
-
-
-@overload
-def json_dumps(
-    item: Any,
-    default_mapping:Optional[dict],
-    force_use_builtin_json: bool,
-    return_bytes:Literal[True],
-    **kwargs,
-) -> bytes:
-    ...
-
-
-@overload
-def json_dumps(
-    item: Any,
-    default_mapping:Optional[dict],
-    force_use_builtin_json: bool,
-    return_bytes:Literal[False],
-    **kwargs,
-) -> str:
-    ...
-
 
 _INT64_MAX = 9223372036854775807
 _INT64_MIN = -9223372036854775808
@@ -812,13 +786,38 @@ def _convert_oversized_ints(obj):
     return obj
 
 
+@overload
 def json_dumps(
     item: Any,
-    default_mapping:Optional[dict]=None,
+    default_mapping: dict | None = None,
+    force_use_builtin_json: bool = False,
+    return_bytes: Literal[False] = False,
+    **kwargs: Any,
+) -> str: ...
+@overload
+def json_dumps(
+    item: Any,
+    default_mapping: dict | None,
+    force_use_builtin_json: bool,
+    return_bytes: Literal[True],
+    **kwargs: Any,
+) -> bytes: ...
+@overload
+def json_dumps(
+    item: Any,
+    default_mapping: dict | None = None,
+    force_use_builtin_json: bool = False,
+    *,
+    return_bytes: Literal[True],
+    **kwargs: Any,
+) -> bytes: ...
+def json_dumps(
+    item: Any,
+    default_mapping: dict | None = None,
     force_use_builtin_json: bool = False,
     return_bytes: bool = False,
-    **kwargs,
-) -> Union[str, bytes]:
+    **kwargs: Any,
+) -> str | bytes:
     """
     Dump json with extra details that are not normally json serializable
 
@@ -829,6 +828,7 @@ def json_dumps(
         When True, we use Python's builtin Json library for serialization,
         even if Orjson is installed.
     """
+    result: str | bytes
     if orjson and not force_use_builtin_json:
         indent = kwargs.pop('indent', None)
         kwargs['option'] = orjson.OPT_NON_STR_KEYS | orjson.OPT_SERIALIZE_NUMPY
@@ -866,4 +866,4 @@ def json_dumps(
         return result
 
 
-json_loads = partial(json.loads, cls=JSONDecoder)
+json_loads: Callable[..., Any] = partial(json.loads, cls=JSONDecoder)
