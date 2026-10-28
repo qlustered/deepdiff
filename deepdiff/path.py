@@ -1,9 +1,11 @@
 import re
 import logging
 from ast import literal_eval
+from collections.abc import Iterable, Sequence
 from functools import lru_cache
+from typing import Any
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 GETATTR = 'GETATTR'
 GET = 'GET'
@@ -29,8 +31,8 @@ class _WildcardToken:
         return hash(('_WildcardToken', self._symbol))
 
 
-SINGLE_WILDCARD = _WildcardToken('*')
-MULTI_WILDCARD = _WildcardToken('**')
+SINGLE_WILDCARD: _WildcardToken = _WildcardToken('*')
+MULTI_WILDCARD: _WildcardToken = _WildcardToken('**')
 
 
 class PathExtractionError(ValueError):
@@ -170,7 +172,7 @@ def _guess_type(elements, elem, index, next_element):
     return {}
 
 
-def check_elem(elem):
+def check_elem(elem: object) -> None:
     if isinstance(elem, str) and elem.startswith("__") and elem.endswith("__"):
         raise ValueError("traversing dunder attributes is not allowed")
 
@@ -213,7 +215,7 @@ def _get_nested_obj_and_force(obj, elements, next_element=None):
     return obj
 
 
-def extract(obj, path):
+def extract(obj: object, path: str) -> Any:
     """
     Get the item from obj based on path.
 
@@ -271,7 +273,9 @@ def extract(obj, path):
     return _get_nested_obj(obj, elements)
 
 
-def parse_path(path, root_element=DEFAULT_FIRST_ELEMENT, include_actions=False):
+def parse_path(
+    path: str, root_element: tuple[str, str] | None = DEFAULT_FIRST_ELEMENT, include_actions: bool = False
+) -> list[Any]:
     """
     Parse a path to a format that is machine readable
 
@@ -284,7 +288,7 @@ def parse_path(path, root_element=DEFAULT_FIRST_ELEMENT, include_actions=False):
         What the root is called in the path.
 
     include_actions: boolean, default=False
-        If True, we return the action required to retrieve the item at each element of the path.  
+        If True, we return the action required to retrieve the item at each element of the path.
 
     **Examples**
 
@@ -310,7 +314,7 @@ def parse_path(path, root_element=DEFAULT_FIRST_ELEMENT, include_actions=False):
     return [{'element': i[0], 'action': i[1]} for i in result]
 
 
-def stringify_element(param, quote_str=None):
+def stringify_element(param: str, quote_str: str | None = None) -> str:
     has_quote = "'" in param
     has_double_quote = '"' in param
     if has_quote and has_double_quote and not quote_str:
@@ -329,7 +333,7 @@ def stringify_element(param, quote_str=None):
     return result
 
 
-def stringify_path(path, root_element=DEFAULT_FIRST_ELEMENT, quote_str="'{}'"):
+def stringify_path(path: Sequence[Any], root_element: tuple[str, str] = DEFAULT_FIRST_ELEMENT, quote_str: str = "'{}'") -> str:
     """
     Gets the path as an string.
 
@@ -366,7 +370,7 @@ _WILDCARD_RE = re.compile(
 )
 
 
-def path_has_wildcard(path):
+def path_has_wildcard(path: str) -> bool:
     """Check if a path string contains wildcard segments (* or **)."""
     return bool(_WILDCARD_RE.search(path))
 
@@ -381,29 +385,31 @@ class GlobPathMatcher:
     ``**`` matches zero or more path segments.
     """
 
-    def __init__(self, pattern_path):
+    original_pattern: str
+
+    def __init__(self, pattern_path: str) -> None:
         self.original_pattern = pattern_path
         elements = _path_to_elements(pattern_path, root_element=('root', GETATTR))
         # Skip the root element for matching
         self._pattern = elements[1:]
 
-    def match(self, path_string):
+    def match(self, path_string: str) -> bool:
         """Return True if *path_string* matches this pattern exactly."""
         target = _path_to_elements(path_string, root_element=('root', GETATTR))[1:]
         return self._match_segments(target, 0, 0, {}, allow_extra_target=False)
 
-    def match_or_is_ancestor(self, path_string):
+    def match_or_is_ancestor(self, path_string: str) -> bool:
         """Return True if *path_string* matches OR is an ancestor of a potential match.
 
         This is needed for ``include_paths``: we must not prune a path that
         could lead to a matching descendant.
         """
         target = _path_to_elements(path_string, root_element=('root', GETATTR))[1:]
-        memo = {}
+        memo: dict[tuple[int, int], bool] = {}
         return (self._match_segments(target, 0, 0, memo, allow_extra_target=False)
                 or self._could_match_descendant(target, 0, 0, {}))
 
-    def match_or_is_descendant(self, path_string):
+    def match_or_is_descendant(self, path_string: str) -> bool:
         """Return True if *path_string* matches OR is a descendant of a matching path.
 
         Equivalent to: the pattern matches some prefix of *path_string*.
@@ -411,7 +417,7 @@ class GlobPathMatcher:
         target = _path_to_elements(path_string, root_element=('root', GETATTR))[1:]
         return self._match_segments(target, 0, 0, {}, allow_extra_target=True)
 
-    def _match_segments(self, target, pi, ti, memo, allow_extra_target):
+    def _match_segments(self, target, pi: int, ti: int, memo: dict[tuple[int, int], bool], allow_extra_target: bool) -> bool:
         """Recursive segment matcher with backtracking for ``**``.
 
         ``memo`` is a per-top-level-call dict keyed by ``(pi, ti)`` so each
@@ -485,7 +491,7 @@ class GlobPathMatcher:
         return result
 
 
-def compile_glob_paths(paths):
+def compile_glob_paths(paths: Iterable[str] | None) -> list[GlobPathMatcher] | None:
     """Compile a list of glob pattern strings into GlobPathMatcher objects.
 
     Returns a list of ``GlobPathMatcher`` or ``None`` if *paths* is empty/None.
