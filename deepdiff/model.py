@@ -817,7 +817,7 @@ class DiffLevel:
 
     def copy(self) -> 'DiffLevel':
         """
-        Get a deep copy of this comparision line.
+        Get a deep copy of this comparison line.
         :return: The leaf ("downmost") object of the copy.
         """
         orig = self.all_up

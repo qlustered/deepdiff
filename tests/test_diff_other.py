@@ -71,6 +71,15 @@ class TestDiffOther:
         res = DeepDiff(d1, d2, truncate_datetime='second')
         assert res['values_changed']["root['a']"]['new_value'] == 80139
 
+    def test_truncate_datetime_with_date(self):
+        d1 = {'a': datetime.date(2020, 5, 17)}
+        d2 = {'a': datetime.date(2020, 5, 17)}
+        assert DeepDiff(d1, d2, truncate_datetime='minute') == {}
+
+        d3 = {'a': datetime.date(2020, 5, 18)}
+        res = DeepDiff(d1, d3, truncate_datetime='day')
+        assert res['values_changed']["root['a']"]['new_value'] == datetime.date(2020, 5, 18)
+
     def test_invalid_verbose_level(self):
         with pytest.raises(ValueError) as excinfo:
             DeepDiff(1, 2, verbose_level=5)

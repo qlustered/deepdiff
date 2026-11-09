@@ -88,3 +88,4 @@ Authors in order of the timeline of their contributions:
 - [akshat62](https://github.com/akshat62) for adding Fraction numeric support.
 - [akshat62](https://github.com/akshat62) for adding wildcard/glob pattern support for `exclude_paths` and `include_paths`.
 - [mgorny](https://github.com/mgorny) for adding missing files to sdist and removing obsolete `MANIFEST.in`.
+- [Sanjays2402](https://github.com/Sanjays2402) for fixing missing type changes between equal-comparing list items (e.g. `[2]` vs `[2.0]`).

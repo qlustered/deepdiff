@@ -1,6 +1,10 @@
 # DeepDiff Change log
 
+- Unreleased
+    - Fixed missing type changes between equal-comparing items inside ordered iterables, e.g. `DeepDiff([2], [2.0])` now reports the `int` → `float` change like `DeepDiff(2, 2.0)` and `DeepDiff({'a': 2}, {'a': 2.0})` already do (issue #605).
+
 - v9-1-0
+    - Fixed `_dict_from_slots` dropping a parent-declared mangled `__slots__` attribute for a subclass instance, because the name was unmangled using the concrete instance type instead of the declaring class (#506)
     - Added multiprocessing support for DeepDiff: parallel distance computation and parallel subtree diffing with aggregated worker stats, deterministic ordering, and automatic fallback to serial when unsafe (e.g. `custom_operators`, `*_obj_callback`, `ignore_order_func`)
     - Added wildcard/glob pattern support for `exclude_paths` and `include_paths` thanks to [akshat62](https://github.com/akshat62)
     - Reimplemented internal cache for improved performance

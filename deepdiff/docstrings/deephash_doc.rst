@@ -92,7 +92,7 @@ ignore_type_in_groups
     1. Set ignore_string_type_changes=True which is the default.
     2. Set ignore_type_in_groups=[(str, bytes)]. Here you are saying if we detect one type to be str and the other one bytes, do not report them as type change. It is exactly as passing ignore_type_in_groups=[DeepDiff.strings] or ignore_type_in_groups=DeepDiff.strings .
 
-    Now what if you want also typeA and typeB to be ignored when comparing agains each other?
+    Now what if you want also typeA and typeB to be ignored when comparing against each other?
 
     1. ignore_type_in_groups=[DeepDiff.strings, (typeA, typeB)]
     2. or ignore_type_in_groups=[(str, bytes), (typeA, typeB)]

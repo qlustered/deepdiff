@@ -116,3 +116,40 @@ class TestCommands:
         diffed = runner.invoke(extract, ['root[2][2]', path])
         assert 0 == diffed.exit_code
         assert '0.288\n' == diffed.output
+
+
+class TestCliEntryPoint:
+    """Tests for the ``deep`` console-script wrapper (deepdiff/cli.py)."""
+
+    def test_main_runs_cli_when_click_available(self):
+        # click is available in the test environment; invoking the entry point
+        # with --help should print the group help and exit cleanly.
+        from click.testing import CliRunner
+
+        from deepdiff.commands import cli
+
+        result = CliRunner().invoke(cli, ['--help'])
+        assert result.exit_code == 0
+        assert 'command line tool' in result.output
+
+    def test_main_reports_missing_click_dependency(self, monkeypatch):
+        # Simulate a default install without the optional ``cli`` extra: the
+        # entry point must fail with an actionable message rather than a bare
+        # ModuleNotFoundError traceback. See issue #594.
+        import builtins
+
+        from deepdiff import cli as cli_entry
+
+        real_import = builtins.__import__
+
+        def fake_import(name, *args, **kwargs):
+            if name == 'click':
+                raise ImportError("No module named 'click'")
+            return real_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, '__import__', fake_import)
+
+        with pytest.raises(SystemExit) as exc_info:
+            cli_entry.main()
+
+        assert 'pip install deepdiff[cli]' in str(exc_info.value)

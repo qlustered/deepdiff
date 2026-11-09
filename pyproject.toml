@@ -83,7 +83,7 @@ optimize = [
 ]
 
 [project.scripts]
-deep = "deepdiff.commands:cli"
+deep = "deepdiff.cli:main"
 
 [project.urls]
 Homepage = "https://zepworks.com/deepdiff/"

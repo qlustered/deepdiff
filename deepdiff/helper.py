@@ -496,20 +496,21 @@ def number_to_string(number: Any, significant_digits: int, number_format_notatio
             number = int(number)
     elif isinstance(number, only_complex_number):  # type: ignore
         # Case for complex numbers.
-        number = number.__class__(
-            "{real}+{imag}j".format(  # type: ignore
-                real=number_to_string(
-                    number=number.real,  # type: ignore
-                    significant_digits=significant_digits,
-                    number_format_notation=number_format_notation
-                ),
-                imag=number_to_string(
-                    number=number.imag,  # type: ignore
-                    significant_digits=significant_digits,
-                    number_format_notation=number_format_notation
-                )
-            )  # type: ignore
+        real = number_to_string(
+            number=number.real,  # type: ignore
+            significant_digits=significant_digits,
+            number_format_notation=number_format_notation
         )
+        imag = number_to_string(
+            number=number.imag,  # type: ignore
+            significant_digits=significant_digits,
+            number_format_notation=number_format_notation
+        )
+        # imag already carries its own sign; joining with a literal "+" would
+        # produce an invalid "+-" string (e.g. "1.0+-1.0j") for negative
+        # imaginary parts and break the round-trip back to a complex number.
+        imag = imag if imag.startswith("-") else "+" + imag
+        number = number.__class__("{}{}j".format(real, imag))  # type: ignore
     else:
         number = round(number=number, ndigits=significant_digits)  # type: ignore
 
@@ -690,7 +691,9 @@ def datetime_normalize(
         datetime.timezone, "BaseTzInfo"
     ] = datetime.timezone.utc,
 ) -> Any:
-    if truncate_datetime:
+    # A plain date has no time component, so truncation does not apply to it.
+    has_time = not (isinstance(obj, datetime.date) and not isinstance(obj, datetime.datetime))
+    if truncate_datetime and has_time:
         if truncate_datetime == 'second':
             obj = obj.replace(microsecond=0)
         elif truncate_datetime == 'minute':

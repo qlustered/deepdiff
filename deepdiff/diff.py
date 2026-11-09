@@ -503,10 +503,13 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
 
     @staticmethod
     def _dict_from_slots(object: Any) -> Dict[str, Any]:
-        def unmangle(attribute: str) -> str:
+        def unmangle(attribute: str, klass: type) -> str:
+            # A mangled slot (e.g. ``__id``) is stored under the name of the
+            # class that declared it, not the concrete instance type, so a
+            # subclass instance would otherwise lose a parent-defined slot (#506).
             if attribute.startswith('__') and attribute != '__weakref__':
                 return '_{type}{attribute}'.format(
-                    type=type(object).__name__,
+                    type=klass.__name__,
                     attribute=attribute
                 )
             return attribute
@@ -522,11 +525,15 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
             slots = getattr(type_in_mro, '__slots__', None)
             if slots:
                 if isinstance(slots, strings):
-                    all_slots.append(slots)
+                    all_slots.append((type_in_mro, slots))
                 else:
-                    all_slots.extend(slots)
+                    all_slots.extend((type_in_mro, i) for i in slots)
 
-        return {i: getattr(object, key) for i in all_slots if hasattr(object, key := unmangle(i))}
+        return {
+            i: getattr(object, key)
+            for (klass, i) in all_slots
+            if hasattr(object, key := unmangle(i, klass))
+        }
 
     def _diff_enum(self, level: Any, parents_ids: FrozenSet[int]=frozenset(), local_tree: Optional[Any]=None) -> None:
         t1 = detailed__dict__(level.t1, include_keys=ENUM_INCLUDE_KEYS)
@@ -1094,7 +1101,7 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
         opcodes = seq.get_opcodes()
         opcodes_with_values = []
 
-        # TODO: this logic should be revisted so we detect reverse operations
+        # TODO: this logic should be revisited so we detect reverse operations
         # like when a replacement happens at index X and a reverse replacement happens at index Y
         # in those cases we have a "iterable_item_moved" operation.
         for tag, t1_from_index, t1_to_index, t2_from_index, t2_to_index in opcodes:
@@ -1102,6 +1109,22 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
                 opcodes_with_values.append(Opcode(
                     tag, t1_from_index, t1_to_index, t2_from_index, t2_to_index,
                 ))
+                # SequenceMatcher considers items "equal" when they compare equal
+                # (e.g. 2 == 2.0), even when their types differ. Recurse into _diff
+                # for such pairs so that type changes are reported for iterable items
+                # the same way they are for scalars and dict values (issue #605).
+                for index in range(t1_to_index - t1_from_index):
+                    x = level.t1[t1_from_index + index]
+                    y = level.t2[t2_from_index + index]
+                    if get_type(x) != get_type(y):
+                        change_level = level.branch_deeper(
+                            x,
+                            y,
+                            child_relationship_class=child_relationship_class,
+                            child_relationship_param=index + t1_from_index,
+                            child_relationship_param2=index + t2_from_index,
+                        )
+                        self._diff(change_level, parents_ids, local_tree=local_tree)
                 continue
             # print('{:7}   t1[{}:{}] --> t2[{}:{}] {!r:>8} --> {!r}'.format(
             #     tag, t1_from_index, t1_to_index, t2_from_index, t2_to_index, level.t1[t1_from_index:t1_to_index], level.t2[t2_from_index:t2_to_index]))

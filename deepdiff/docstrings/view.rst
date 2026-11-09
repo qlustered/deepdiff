@@ -76,7 +76,7 @@ You can traverse through the tree elements!
 :repetition: Shortcut to get the repetition report
 
 
-The tree view allows you to have more than mere textual representaion of the diffed objects.
+The tree view allows you to have more than mere textual representation of the diffed objects.
 It gives you the actual objects (t1, t2) throughout the tree of parents and children.
 
 **Examples for Tree View**
@@ -199,7 +199,7 @@ List difference ignoring order but reporting repetitions (Tree View)
     <root[0]>
     >>>
     >>> # But the verbosity level does not change the actual report object.
-    >>> # It only changes the textual representaion of the object. We get the actual object here:
+    >>> # It only changes the textual representation of the object. We get the actual object here:
     >>> repeat1.repetition
     {'old_repeat': 1, 'new_repeat': 2, 'old_indexes': [3], 'new_indexes': [0, 1]}
     >>> repeat1.t1
