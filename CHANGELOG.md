@@ -1,6 +1,7 @@
 # DeepDiff Change log
 
 - Unreleased
+    - Allow CacheBox 6 (`cachebox>=5.2,<7`) for Windows ARM64 wheels and Python 3.15 compatibility thanks to [contentis](https://github.com/contentis)
     - Fixed missing type changes between equal-comparing items inside ordered iterables, e.g. `DeepDiff([2], [2.0])` now reports the `int` → `float` change like `DeepDiff(2, 2.0)` and `DeepDiff({'a': 2}, {'a': 2.0})` already do (issue #605).
 
 - v9-1-0
