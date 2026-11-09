@@ -6,7 +6,7 @@ build-backend = "flit_core.buildapi"
 name = "deepdiff"
 version = "9.1.0"
 dependencies = [
-  "cachebox>=5.2,<6",
+  "cachebox>=5.2,<7",
   "orderly-set>=5.5.0,<6",
 ]
 requires-python = ">=3.10"
