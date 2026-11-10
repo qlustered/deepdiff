@@ -30,9 +30,9 @@ The DeepDiff library includes the following modules:
 
 - **DeepSearch** Search for objects within other objects. :doc:`/dsearch`
 
-- **DeepHash** Hash any object based on their content even if they are not "hashable" in Python's eyes. :doc:`/deephash`
+- **DeepHash** Hash any object based on their content even if they are not "hashable" in Python's eyes.  :doc:`/deephash`
 
-- **Delta** Delta of objects that can be applied to other objects. Imagine git commits but for structured data. :doc:`/delta`
+- **Delta** Delta of objects that can be applied to other objects. Imagine git commits but for structured data.  :doc:`/delta`
 
 - **Extract** For extracting a path from an object  :doc:`/extract`
 
@@ -72,7 +72,8 @@ Tutorials
 *********
 
 Tutorials can be found on `Zepworks blog <https://zepworks.com/tags/deepdiff/>`_
-                                                                                                                                                                                                           
+                                                                                                                                                                                                          
+
 ************
 Installation
 ************

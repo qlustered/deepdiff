@@ -36,6 +36,8 @@ _UNSAFE_DEEPDIFF_KWARGS = {
     "custom_operators",
     "exclude_obj_callback",
     "exclude_obj_callback_strict",
+    "include_obj_callback",
+    "include_obj_callback_strict",
 }
 
 
@@ -78,7 +80,7 @@ def _as_non_empty_string_tuple(value: Any, field_name: str) -> Tuple[str, ...]:
 def _parse_quoted_key(token: str, pattern: str) -> str:
     try:
         value = ast.literal_eval(token)
-    except (SyntaxError, ValueError) as exc:
+    except (SyntaxError, ValueError, TypeError) as exc:
         raise CollectionStrategyError(f"invalid quoted key selector in {pattern!r}") from exc
     if not isinstance(value, str):
         raise CollectionStrategyError(f"quoted key selector in {pattern!r} must contain a string")
@@ -131,7 +133,10 @@ def _parse_pattern(pattern: str) -> Tuple[PathToken, ...]:
             if token == "*":
                 tokens.append(_ARRAY_WILDCARD)
             elif token.isdigit():
-                tokens.append(int(token))
+                try:
+                    tokens.append(int(token))
+                except ValueError as exc:
+                    raise CollectionStrategyError(f"invalid strategy path {pattern!r}") from exc
             elif len(token) >= 2 and token[0] in ("'", '"') and token[-1] == token[0]:
                 tokens.append(_parse_quoted_key(token, pattern))
             else:
@@ -168,6 +173,8 @@ class CollectionStrategy:
         match_by = _as_non_empty_string_tuple(self.match_by, "match_by")
         sort_by = _as_non_empty_string_tuple(self.sort_by, "sort_by")
         exclude_fields = _as_non_empty_string_tuple(self.exclude_fields, "exclude_fields")
+        if any("." in field_name for field_name in exclude_fields):
+            raise CollectionStrategyError("exclude_fields supports top-level keys only")
 
         if isinstance(self.normalizers, (str, bytes)) or not isinstance(
             self.normalizers, Sequence
@@ -577,18 +584,27 @@ class DeepJSONDiff(MappingABC[str, Any]):
                         f"duplicate identity {label!r} on {context.side} input at "
                         f"{rendered} while applying strategy {strategy.path!r}"
                     )
-                if strategy.sort_by:
-                    group = sorted(group, key=lambda item: item.sort_key or ())
+            if strategy.sort_by:
+                group = sorted(group, key=lambda item: item.sort_key or ())
+            if strategy.duplicates is DuplicateIdentityPolicy.GROUP:
+                # Always a list so a count change diffs record-by-record
+                # instead of as a list-to-dict type change.
                 result[label] = [item.value for item in group]
             else:
                 result[label] = group[0].value
 
         if fallback:
-            result["__deepdiff_fallback__"] = fallback
+            # The key must not start with "__": DeepDiff skips such keys by
+            # default (ignore_private_variables=True), which would silently
+            # drop fallback records from the comparison.
+            result["deepdiff_fallback"] = fallback
         return result
 
-    def get_stats(self) -> Dict[str, Dict[str, Dict[str, Any]]]:
-        """Return diagnostics separated by input side to avoid path conflation."""
+    def get_strategy_stats(self) -> Dict[str, Dict[str, Dict[str, Any]]]:
+        """Return strategy diagnostics separated by input side.
+
+        Distinct from ``DeepDiff.get_stats()``, which reports run statistics.
+        """
         return {
             side: {
                 path: {
@@ -622,6 +638,4 @@ class DeepJSONDiff(MappingABC[str, Any]):
         return self.diff.to_dict(*args, **kwargs)
 
     def to_json(self, *args: Any, **kwargs: Any) -> str:
-        if kwargs.get("sort_keys") and "force_use_builtin_json" not in kwargs:
-            kwargs["force_use_builtin_json"] = True
         return self.diff.to_json(*args, **kwargs)

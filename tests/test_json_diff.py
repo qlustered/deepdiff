@@ -1,5 +1,6 @@
 from copy import deepcopy
 
+import json
 import pytest
 
 from deepdiff import DeepDiff
@@ -33,6 +34,12 @@ def test_identity_matching_ignores_reordering_and_reports_real_changes():
         "dictionary_item_removed",
         "values_changed",
     }
+    # Identity-matched changes must point at the encoded identity labels.
+    assert result["values_changed"] == {
+        "root['users']['[[\"int\",2]]']['name']": {"new_value": "B2", "old_value": "B"}
+    }
+    assert set(result["dictionary_item_added"]) == {"root['users']['[[\"int\",3]]']"}
+    assert set(result["dictionary_item_removed"]) == {"root['users']['[[\"int\",1]]']"}
 
 
 def test_nested_wildcards_match_exactly_one_level():
@@ -67,7 +74,7 @@ def test_wildcards_only_match_their_own_path_level():
         ],
     )
     assert result
-    assert result.get_stats() == {"left": {}, "right": {}}
+    assert result.get_strategy_stats() == {"left": {}, "right": {}}
 
 
 def test_quoted_key_selector_is_round_trippable_with_stats_path():
@@ -79,7 +86,7 @@ def test_quoted_key_selector_is_round_trippable_with_stats_path():
         ],
     )
     assert not result
-    assert result.get_stats()["left"]["$['a-b']"]["strategy"] == "hyphen"
+    assert result.get_strategy_stats()["left"]["$['a-b']"]["strategy"] == "hyphen"
 
 
 def test_quoted_key_selector_supports_escaped_quotes():
@@ -91,7 +98,7 @@ def test_quoted_key_selector_supports_escaped_quotes():
         ],
     )
     assert not result
-    assert result.get_stats()["left"]["$[\"it's\"]"]["strategy"] == "quoted"
+    assert result.get_strategy_stats()["left"]["$[\"it's\"]"]["strategy"] == "quoted"
 
 
 def test_root_and_numeric_index_patterns_are_supported():
@@ -136,6 +143,21 @@ def test_identity_scalar_types_are_supported(identity):
     assert not result
 
 
+def test_ignore_numeric_type_changes_does_not_merge_type_distinct_identities():
+    left = {"items": [{"id": 1, "v": 1}, {"id": 5, "v": 2}, {"id": 9, "v": 3}]}
+    right = {"items": [{"id": 1.0, "v": 1}, {"id": 5, "v": 2}, {"id": 9, "v": 3}]}
+    result = DeepJSONDiff(
+        left,
+        right,
+        collection_strategies=[CollectionStrategy(path="$.items", match_by=("id",))],
+        ignore_numeric_type_changes=True,
+    )
+    # Identity labels are type-preserving strings; forwarded numeric options
+    # cannot merge them, so 1 and 1.0 stay separate records.
+    assert set(result["dictionary_item_added"]) == {"root['items']['[[\"float\",1.0]]']"}
+    assert set(result["dictionary_item_removed"]) == {"root['items']['[[\"int\",1]]']"}
+
+
 @pytest.mark.parametrize("identity", [{"nested": 1}, [1], float("nan"), float("inf")])
 def test_invalid_identity_values_are_rejected(identity):
     with pytest.raises(IdentityExtractionError):
@@ -163,7 +185,7 @@ def test_identity_is_extracted_before_excluded_fields_are_removed():
         ],
     )
     assert not result
-    assert "__deepdiff_fallback__" not in result.canonical_t1["items"]
+    assert "deepdiff_fallback" not in result.canonical_t1["items"]
 
 
 def test_mutating_filter_and_normalizer_do_not_mutate_inputs():
@@ -211,7 +233,7 @@ def test_filter_drops_items_and_reports_stats():
         ],
     )
     assert not result
-    stats = result.get_stats()
+    stats = result.get_strategy_stats()
     assert stats["left"]["$.items"]["filtered"] == 1
     assert stats["right"]["$.items"]["filtered"] == 1
 
@@ -224,10 +246,15 @@ def test_sort_by_handles_finite_and_non_finite_numbers_without_type_errors():
         {"rank": float("nan")},
         {"rank": 1.5},
     ]
+    # JSON round-trips keep each side's nan objects distinct, so DeepDiff
+    # cannot short-circuit the nan comparison by object identity.
+    left_items = json.loads(json.dumps(values))
+    right_items = json.loads(json.dumps(list(reversed(values))))
     result = DeepJSONDiff(
-        {"items": values},
-        {"items": list(reversed(values))},
+        {"items": left_items},
+        {"items": right_items},
         collection_strategies=[CollectionStrategy(path="$.items", sort_by=("rank",))],
+        ignore_nan_inequality=True,
     )
     assert not result
 
@@ -313,6 +340,17 @@ def test_compare_as_set_is_type_stable_and_preserves_duplicates():
     assert not result
 
 
+def test_compare_as_set_reports_count_changes():
+    result = DeepJSONDiff(
+        {"items": [1, 2, 3]},
+        {"items": [1, 3]},
+        collection_strategies=[
+            CollectionStrategy(path="$.items", compare_as_set=True)
+        ],
+    )
+    assert result["iterable_item_removed"] == {"root['items'][1]": 2}
+
+
 @pytest.mark.parametrize(
     "value",
     [
@@ -347,7 +385,7 @@ def test_missing_identity_policies_and_side_separated_stats():
             CollectionStrategy(path="$.items", match_by=("id",))
         ],
     )
-    stats = result.get_stats()
+    stats = result.get_strategy_stats()
     assert stats["left"]["$.items"]["missing_identity"] == 1
     assert stats["right"]["$.items"]["missing_identity"] == 1
 
@@ -378,6 +416,19 @@ def test_missing_identity_policies_and_side_separated_stats():
     assert not excluded
 
 
+def test_fallback_records_are_compared():
+    # Regression: the fallback key must not start with "__", because DeepDiff
+    # skips such keys by default (ignore_private_variables=True).
+    result = DeepJSONDiff(
+        {"items": [{"name": "a"}]},
+        {"items": [{"name": "b"}]},
+        collection_strategies=[CollectionStrategy(path="$.items", match_by=("id",))],
+    )
+    assert result["values_changed"] == {
+        "root['items']['deepdiff_fallback'][0]['name']": {"new_value": "b", "old_value": "a"}
+    }
+
+
 def test_duplicate_identity_policies_and_stats():
     with pytest.raises(DuplicateIdentityError, match="left input"):
         DeepJSONDiff(
@@ -401,7 +452,27 @@ def test_duplicate_identity_policies_and_stats():
         ],
     )
     assert not result
-    assert result.get_stats()["left"]["$.items"]["duplicate_groups"] == 1
+    assert result.get_strategy_stats()["left"]["$.items"]["duplicate_groups"] == 1
+
+
+def test_group_policy_reports_count_changes_per_record():
+    result = DeepJSONDiff(
+        {"items": [{"id": 1, "v": 1}, {"id": 1, "v": 2}]},
+        {"items": [{"id": 1, "v": 1}]},
+        collection_strategies=[
+            CollectionStrategy(
+                path="$.items",
+                match_by=("id",),
+                duplicates=DuplicateIdentityPolicy.GROUP,
+            )
+        ],
+    )
+    # A duplicate becoming a single record is an item removal, not a
+    # list-to-dict type change.
+    assert set(result) == {"iterable_item_removed"}
+    assert result["iterable_item_removed"] == {
+        "root['items']['[[\"int\",1]]'][1]": {"id": 1, "v": 2}
+    }
 
 
 def test_nested_stats_do_not_merge_different_logical_parents_across_sides():
@@ -421,7 +492,7 @@ def test_nested_stats_do_not_merge_different_logical_parents_across_sides():
         ],
     )
     assert not result
-    stats = result.get_stats()
+    stats = result.get_strategy_stats()
     assert stats["left"]["$.orders[0].items"]["items"] == 2
     assert stats["right"]["$.orders[0].items"]["items"] == 1
 
@@ -435,6 +506,8 @@ def test_nested_stats_do_not_merge_different_logical_parents_across_sides():
         "ignore_order_func",
         "iterable_compare_func",
         "custom_operators",
+        "include_obj_callback",
+        "include_obj_callback_strict",
     ],
 )
 def test_path_sensitive_deepdiff_options_are_rejected(option):
@@ -445,6 +518,15 @@ def test_path_sensitive_deepdiff_options_are_rejected(option):
 def test_unrelated_deepdiff_kwargs_are_forwarded():
     result = DeepJSONDiff({"value": 1}, {"value": 1.0}, ignore_numeric_type_changes=True)
     assert not result
+
+    # ignore_order is forwarded: reordered lists produce no diff.
+    tree = DeepJSONDiff(
+        {"items": [1, 2]},
+        {"items": [2, 1]},
+        ignore_order=True,
+        view="tree",
+    )
+    assert not tree
 
 
 @pytest.mark.parametrize(
@@ -458,10 +540,12 @@ def test_unrelated_deepdiff_kwargs_are_forwarded():
         {"path": "$['unterminated]"},
         {"path": "$['a', 'b']"},
         {"path": "$['a' (1) 'b']"},
+        {"path": "$[²]"},
         {"path": "$users"},
         {"path": "$.users", "match_by": "id"},
         {"path": "$.users", "sort_by": ("",)},
         {"path": "$.users", "exclude_fields": ("",)},
+        {"path": "$.users", "exclude_fields": ("meta.generatedAt",)},
         {"path": "$.users", "normalizers": "normalize"},
         {"path": "$.users", "normalizers": (None,)},
         {"path": "$.users", "filter_func": "filter"},
@@ -517,4 +601,4 @@ def test_mapping_facade_and_serialization_delegation():
     assert len(result) == 1
     assert "values_changed" in repr(result)
     assert result.to_dict() == result.diff.to_dict()
-    assert result.to_json(sort_keys=True)
+    assert result.to_json() == result.diff.to_json()
