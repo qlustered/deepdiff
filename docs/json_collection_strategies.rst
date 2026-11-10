@@ -1,0 +1,1 @@
+../deepdiff/docstrings/json_collection_strategies.rst

@@ -12,3 +12,12 @@ from .search import DeepSearch as DeepSearch, grep as grep
 from .deephash import DeepHash as DeepHash
 from .delta import Delta as Delta
 from .path import extract as extract, parse_path as parse_path
+from .json_diff import (
+    CollectionStrategy as CollectionStrategy,
+    CollectionStrategyError as CollectionStrategyError,
+    DeepJSONDiff as DeepJSONDiff,
+    DuplicateIdentityError as DuplicateIdentityError,
+    DuplicateIdentityPolicy as DuplicateIdentityPolicy,
+    IdentityExtractionError as IdentityExtractionError,
+    MissingIdentityPolicy as MissingIdentityPolicy,
+)

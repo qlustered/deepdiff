@@ -26,6 +26,8 @@ The DeepDiff library includes the following modules:
 
     It returns the deep difference of python objects. It can also be used to take the distance between objects. :doc:`/deep_distance`
 
+- **DeepJSONDiff** For opt-in, path-scoped comparison of JSON collections using identity matching, sorting, filtering, normalization, and explicit duplicate or missing-identity policies. :doc:`/json_collection_strategies`
+
 - **DeepSearch** Search for objects within other objects. :doc:`/dsearch`
 
 - **DeepHash** Hash any object based on their content even if they are not "hashable" in Python's eyes.  :doc:`/deephash`
@@ -39,6 +41,11 @@ The DeepDiff library includes the following modules:
 ***********
 What Is New
 ***********
+
+Unreleased
+----------
+
+   - Added the opt-in ``DeepJSONDiff`` facade and ``CollectionStrategy`` API for path-scoped JSON collection matching, sorting, filtering, normalization, diagnostics, and explicit missing or duplicate identity policies.
 
 DeepDiff 9-0-0
 --------------
@@ -91,6 +98,7 @@ Importing
 .. code:: python
 
     >>> from deepdiff import DeepDiff  # For Deep Difference of 2 objects
+    >>> from deepdiff import DeepJSONDiff, CollectionStrategy  # For path-scoped JSON collection comparison
     >>> from deepdiff import grep, DeepSearch  # For finding if item exists in an object
     >>> from deepdiff import DeepHash  # For hashing objects based on their contents
     >>> from deepdiff import Delta  # For creating delta of objects that can be applied later to other objects.
@@ -142,6 +150,7 @@ References
    :maxdepth: 4
 
    diff
+   json_collection_strategies
    dsearch
    deephash
    delta
