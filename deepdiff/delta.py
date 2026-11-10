@@ -208,9 +208,10 @@ class Delta:
         if self._reversed_diff is None:
             self._reversed_diff = self._get_reverse_diff()
         self.diff, self._reversed_diff = self._reversed_diff, self.diff
-        result = self.__add__(other)
-        self.diff, self._reversed_diff = self._reversed_diff, self.diff
-        return result
+        try:
+            return self.__add__(other)
+        finally:
+            self.diff, self._reversed_diff = self._reversed_diff, self.diff
 
     def _raise_or_log(self, msg, level='error'):
         if self.log_errors:
