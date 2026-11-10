@@ -1451,6 +1451,15 @@ class TestNumpyDelta:
 
 class TestDeltaOther:
 
+    def test_reverse_failure_preserves_delta_direction(self):
+        before = {'counter': 1}
+        after = {'counter': 2}
+        delta = Delta(DeepDiff(before, after), bidirectional=True, raise_errors=True, log_errors=False)
+        with pytest.raises(DeltaError):
+            {'counter': 9} - delta
+        assert before + delta == after
+        assert after - delta == before
+
     def test_list_ignore_order_various_deltas1(self):
         t1 = [5, 1, 3, 1, 4, 4, 6]
         t2 = [7, 4, 4, 1, 3, 4, 8]
