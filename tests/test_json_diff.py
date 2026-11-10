@@ -57,6 +57,19 @@ def test_nested_wildcards_match_exactly_one_level():
     )
 
 
+def test_wildcards_only_match_their_own_path_level():
+    result = DeepJSONDiff(
+        {"a": {"x": [1, 2]}, "b": [[1], [2]]},
+        {"a": {"x": [2, 1]}, "b": [[2], [1]]},
+        collection_strategies=[
+            CollectionStrategy(path="$.a[*]", name="array-wild"),
+            CollectionStrategy(path="$.b.*", name="key-wild"),
+        ],
+    )
+    assert result
+    assert result.get_stats() == {"left": {}, "right": {}}
+
+
 def test_quoted_key_selector_is_round_trippable_with_stats_path():
     result = DeepJSONDiff(
         {"a-b": [{"id": 2}, {"id": 1}]},
@@ -67,6 +80,18 @@ def test_quoted_key_selector_is_round_trippable_with_stats_path():
     )
     assert not result
     assert result.get_stats()["left"]["$['a-b']"]["strategy"] == "hyphen"
+
+
+def test_quoted_key_selector_supports_escaped_quotes():
+    result = DeepJSONDiff(
+        {"it's": [{"id": 2}, {"id": 1}]},
+        {"it's": [{"id": 1}, {"id": 2}]},
+        collection_strategies=[
+            CollectionStrategy(path=r"$['it\'s']", match_by=("id",), name="quoted")
+        ],
+    )
+    assert not result
+    assert result.get_stats()["left"]["$[\"it's\"]"]["strategy"] == "quoted"
 
 
 def test_root_and_numeric_index_patterns_are_supported():
@@ -173,6 +198,24 @@ def test_mutating_filter_and_normalizer_do_not_mutate_inputs():
     assert right == original_right
 
 
+def test_filter_drops_items_and_reports_stats():
+    result = DeepJSONDiff(
+        {"items": [{"id": 1, "active": True}, {"id": 2, "active": False}]},
+        {"items": [{"id": 1, "active": True}, {"id": 9, "active": False}]},
+        collection_strategies=[
+            CollectionStrategy(
+                path="$.items",
+                match_by=("id",),
+                filter_func=lambda item: item.get("active", True),
+            )
+        ],
+    )
+    assert not result
+    stats = result.get_stats()
+    assert stats["left"]["$.items"]["filtered"] == 1
+    assert stats["right"]["$.items"]["filtered"] == 1
+
+
 def test_sort_by_handles_finite_and_non_finite_numbers_without_type_errors():
     values = [
         {"rank": float("inf")},
@@ -198,6 +241,37 @@ def test_sort_by_is_type_stable_for_int_and_float():
     assert not result
     assert isinstance(result.canonical_t1["items"][0]["rank"], int)
     assert isinstance(result.canonical_t1["items"][1]["rank"], float)
+
+
+def test_sort_by_orders_missing_none_bool_and_string_values():
+    values = [{"rank": None}, {"rank": True}, {"rank": 5}, {"rank": "z"}, {}]
+    result = DeepJSONDiff(
+        {"items": values},
+        {"items": list(reversed(values))},
+        collection_strategies=[CollectionStrategy(path="$.items", sort_by=("rank",))],
+    )
+    assert not result
+
+
+def test_sort_by_extracts_through_lists_and_treats_bad_paths_as_missing():
+    result = DeepJSONDiff(
+        {"items": [[1, "a"], [0, "b"]]},
+        {"items": [[0, "b"], [1, "a"]]},
+        collection_strategies=[CollectionStrategy(path="$.items", sort_by=("0",))],
+    )
+    assert not result
+
+    # Out-of-range indexes and paths through scalars become stable missing keys.
+    assert DeepJSONDiff(
+        {"items": [[1], [2]]},
+        {"items": [[2], [1]]},
+        collection_strategies=[CollectionStrategy(path="$.items", sort_by=("5",))],
+    )
+    assert DeepJSONDiff(
+        {"items": [{"id": 1}, {"id": 2}]},
+        {"items": [{"id": 2}, {"id": 1}]},
+        collection_strategies=[CollectionStrategy(path="$.items", sort_by=("id.sub",))],
+    )
 
 
 def test_sort_by_supports_json_lists_and_string_keyed_mappings():
@@ -382,6 +456,9 @@ def test_unrelated_deepdiff_kwargs_are_forwarded():
         {"path": "$.users[-1]"},
         {"path": "$.users[abc]"},
         {"path": "$['unterminated]"},
+        {"path": "$['a', 'b']"},
+        {"path": "$['a' (1) 'b']"},
+        {"path": "$users"},
         {"path": "$.users", "match_by": "id"},
         {"path": "$.users", "sort_by": ("",)},
         {"path": "$.users", "exclude_fields": ("",)},
@@ -394,6 +471,7 @@ def test_unrelated_deepdiff_kwargs_are_forwarded():
         {"path": "$.users", "duplicates": "unknown"},
         {"path": "$.users", "compare_as_set": True, "sort_by": ("id",)},
         {"path": "$.users", "compare_as_set": True, "match_by": ("id",)},
+        {"path": "$.users", "compare_as_set": 1},
     ],
 )
 def test_invalid_configuration_is_rejected(kwargs):
