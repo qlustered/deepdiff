@@ -485,6 +485,8 @@ class Delta:
             if(insert and elem < len(obj)):  # type: ignore
                 obj.insert(elem, None)  # type: ignore
 
+            if not self.mutate:
+                new_value = deepcopy(new_value)
             self._set_new_value(parent, parent_to_obj_elem, parent_to_obj_action,
                                 obj, elements, path, elem, action, new_value)
 
@@ -589,6 +591,8 @@ class Delta:
                     continue
             else:
                 new_value = value['new_value']
+                if not self.mutate:
+                    new_value = deepcopy(new_value)
 
             self._set_new_value(parent, parent_to_obj_elem, parent_to_obj_action,
                                 obj, elements, path, elem, action, new_value)
