@@ -559,7 +559,7 @@ def load_path_content(path, file_type=None):
         except ImportError:  # pragma: no cover.
             import csv
             with open(path, 'r') as the_file:
-                content = list(csv.DictReader(the_file))
+                content = list(csv.DictReader(the_file, delimiter='\t' if file_type == 'tsv' else ','))
 
         logger.info(f"NOTE: CSV content was empty in {path}")
 
@@ -632,7 +632,7 @@ def _save_content(content, path, file_type, keep_backup=True):
             dict_writer = csv.DictWriter
         with open(path, 'w', newline='') as csvfile:
             fieldnames = list(content[0].keys())
-            writer = dict_writer(csvfile, fieldnames=fieldnames)
+            writer = dict_writer(csvfile, fieldnames=fieldnames, delimiter='\t' if file_type == 'tsv' else ',')
             writer.writeheader()
             writer.writerows(content)
     else:
