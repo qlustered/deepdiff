@@ -319,7 +319,7 @@ class DeepSearch(Dict[str, Union[Dict[str, Any], SetOrdered, List[str]]]):
 
     def __search(self, obj: Any, item: Any, parent: str = "root", parents_ids: FrozenSet[int] = frozenset()) -> None:
         """The main search method"""
-        if self.__skip_this(item, parent):
+        if self.__skip_this(obj, parent):
             return
 
         elif isinstance(obj, strings) and isinstance(item, (strings, RE_COMPILED_TYPE)):
