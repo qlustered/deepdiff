@@ -102,7 +102,7 @@ nox
 
 ## Development Notes
 
-- **Python Support**: 3.10+ and PyPy3
+- **Python Support**: 3.11+ and PyPy3
 - **Main Branch**: `master` (PRs typically go to `dev` branch)
 - **Build System**: Modern `pyproject.toml` with `flit_core`
 - **Dependencies**: Core dependency is `orderly-set>=5.4.1,<6`

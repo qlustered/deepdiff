@@ -539,15 +539,9 @@ def load_path_content(path, file_type=None):
         with open(path, 'r') as the_file:
             content = yaml.safe_load(the_file)
     elif file_type == 'toml':
-        try:
-            if sys.version_info >= (3, 11):
-                import tomllib as tomli
-            else:
-                import tomli
-        except ImportError:  # pragma: no cover.
-            raise ImportError('On python<=3.10 tomli needs to be installed.') from None  # pragma: no cover.
+        import tomllib
         with open(path, 'rb') as the_file:
-            content = tomli.load(the_file)
+            content = tomllib.load(the_file)
     elif file_type == 'pickle':
         with open(path, 'rb') as the_file:
             content = the_file.read()
