@@ -19,7 +19,7 @@
 - [Extract](https://zepworks.com/deepdiff/current/extract.html): Extract an item from a nested Python object using its path.
 - [commandline](https://zepworks.com/deepdiff/current/commandline.html): Use DeepDiff from commandline.
 
-Tested on Python 3.10+ and PyPy3.
+Tested on Python 3.11+ and PyPy3.
 
 - **[Documentation](https://zepworks.com/deepdiff/9.1.0/)**
 
@@ -57,7 +57,7 @@ If you want to improve the performance of DeepDiff with certain functionalities 
 
 Install optional packages:
 - [yaml](https://pypi.org/project/PyYAML/)
-- [tomli](https://pypi.org/project/tomli/) (python 3.10 and older) and [tomli-w](https://pypi.org/project/tomli-w/) for writing
+- [tomli-w](https://pypi.org/project/tomli-w/) for writing
 - [clevercsv](https://pypi.org/project/clevercsv/) for more robust CSV parsing
 - [orjson](https://pypi.org/project/orjson/) for speed and memory optimized parsing
 - [pydantic](https://pypi.org/project/pydantic/)
