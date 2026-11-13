@@ -1,6 +1,6 @@
 import copy
 import logging
-from typing import List, Dict, IO, Callable, Set, Union, Optional, Any, cast
+from typing import TYPE_CHECKING, IO, Callable, Any, cast
 from functools import partial, cmp_to_key
 from collections.abc import Mapping
 from copy import deepcopy
@@ -22,7 +22,10 @@ from deepdiff.path import (
 from deepdiff.anyset import AnySet
 from deepdiff.summarize import summarize
 
-logger = logging.getLogger(__name__)
+if TYPE_CHECKING:
+    from _typeshed import SupportsWrite
+
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 VERIFICATION_MSG = 'Expected the old value for {} to be {} but it is {}. Error found on: {}. You may want to set force=True, especially if this delta is created by passing flat_rows_list or flat_dict_list'
@@ -46,7 +49,7 @@ INDEXES_NOT_FOUND_WHEN_IGNORE_ORDER = 'Delta added to an incompatible object. Un
 NUMPY_TO_LIST = 'NUMPY_TO_LIST'
 NOT_VALID_NUMPY_TYPE = "{} is not a valid numpy type."
 
-doc = get_doc('delta.rst')
+doc: str = get_doc('delta.rst')
 
 
 class DeltaError(ValueError):
@@ -67,27 +70,42 @@ class Delta:
 
     __doc__ = doc
 
+    _reversed_diff: DeepDiff | Mapping | None
+    bidirectional: bool
+    always_include_values: bool
+    diff: DeepDiff | Mapping
+    mutate: bool
+    raise_errors: bool
+    log_errors: bool
+    serializer: Callable[..., bytes | Any]
+    deserializer: Callable[..., Any]
+    force: bool
+    fill: Any
+    get_nested_obj: Callable[..., Any]
+
+    post_process_paths_to_convert: dict[str, Any]
+
     def __init__(
         self,
-        diff: Union[DeepDiff, Mapping, str, bytes, None]=None,
-        delta_path: Optional[str]=None,
-        delta_file: Optional[IO]=None,
-        delta_diff: Optional[dict]=None,
-        flat_dict_list: Optional[List[Dict]]=None,
-        flat_rows_list: Optional[List[FlatDeltaRow]]=None,
+        diff: DeepDiff | Mapping | str | bytes | None=None,
+        delta_path: str | None=None,
+        delta_file: IO | None=None,
+        delta_diff: dict | None=None,
+        flat_dict_list: list[dict] | None=None,
+        flat_rows_list: list[FlatDeltaRow] | None=None,
         deserializer: Callable=pickle_load,
         log_errors: bool=True,
         mutate: bool=False,
         raise_errors: bool=False,
-        safe_to_import: Optional[Set[str]]=None,
+        safe_to_import: set[str] | None=None,
         serializer: Callable=pickle_dump,
-        verify_symmetry: Optional[bool]=None,
+        verify_symmetry: bool | None=None,
         bidirectional: bool=False,
         always_include_values: bool=False,
-        iterable_compare_func_was_used: Optional[bool]=None,
+        iterable_compare_func_was_used: bool | None=None,
         force: bool=False,
         fill: Any=not_found,
-    ):
+    ) -> None:
         # for pickle deserializer:
         if hasattr(deserializer, '__code__') and 'safe_to_import' in set(deserializer.__code__.co_varnames):
             _deserializer = deserializer
@@ -166,13 +184,13 @@ class Delta:
             self.get_nested_obj = _get_nested_obj
         self.reset()
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "<Delta: {}>".format(summarize(self.diff, max_length=100))  # type: ignore[arg-type]
 
-    def reset(self):
+    def reset(self) -> None:
         self.post_process_paths_to_convert = dict_()
 
-    def __add__(self, other):
+    def __add__(self, other: object) -> Any:
         if isinstance(other, numbers) and self._numpy_paths:  # type: ignore
             raise DeltaNumpyOperatorOverrideError(DELTA_NUMPY_OPERATOR_OVERRIDE_MSG)
         if self.mutate:
@@ -204,7 +222,7 @@ class Delta:
 
     __radd__ = __add__
 
-    def __rsub__(self, other):
+    def __rsub__(self, other: object) -> Any:
         if self._reversed_diff is None:
             self._reversed_diff = self._get_reverse_diff()
         self.diff, self._reversed_diff = self._reversed_diff, self.diff
@@ -252,7 +270,7 @@ class Delta:
                     if next_element is None or isinstance(next_element, str):
                         _forced_old_value = {}
                     else:
-                        _forced_old_value = []    
+                        _forced_old_value = []
                 else:
                     _forced_old_value = forced_old_value
                 if action == GET:
@@ -347,7 +365,7 @@ class Delta:
                     parent_to_obj_action, elements,
                     to_type=list, from_type=tuple)
         if elem != 0 and self.force and isinstance(obj, list) and len(obj) == 0:
-            # it must have been a dictionary    
+            # it must have been a dictionary
             obj = {}
             self._simple_set_elem_value(obj=parent, path_for_err_reporting=path, elem=parent_to_obj_elem,
                                         value=obj, action=parent_to_obj_action)
@@ -419,7 +437,7 @@ class Delta:
         elements = _path_to_elements(path_and_value[0])
         # Example elements: [(4.3, 'GET'), ('b', 'GETATTR'), ('a3', 'GET')]
         # We only care about the values in the elements not how to get the values.
-        return [i[0] for i in elements] 
+        return [i[0] for i in elements]
 
     @staticmethod
     def _sort_comparison(left, right):
@@ -667,7 +685,7 @@ class Delta:
                 # import pytest; pytest.set_trace()
                 obj = self.get_nested_obj(obj=self, elements=elements)
                 is_obj_tuple = isinstance(obj, tuple)
-                for opcode in opcodes:    
+                for opcode in opcodes:
                     if opcode.tag == 'replace':
                         # Replace items in list a[i1:i2] with b[j1:j2]
                         transformed.extend(opcode.new_values)
@@ -837,7 +855,7 @@ class Delta:
             self._simple_set_elem_value(obj=parent, path_for_err_reporting=path, elem=parent_to_obj_elem,
                                         value=new_obj, action=parent_to_obj_action)
 
-    def _get_reverse_diff(self):
+    def _get_reverse_diff(self) -> dict[str, Any]:
         if not self.bidirectional:
             raise ValueError('Please recreate the delta with bidirectional=True')
 
@@ -863,7 +881,7 @@ class Delta:
                     reverse_path = path_info['new_path'] if path_info.get('new_path') else path
                     r_diff[action][reverse_path] = {
                         'new_value': path_info['old_value'], 'old_value': path_info['new_value']
-                    } 
+                    }
             elif action == 'type_changes':
                 r_diff[action] = {}
                 for path, path_info in info.items():
@@ -901,7 +919,7 @@ class Delta:
                         r_diff[action][path].append(new_op_code)
         return r_diff
 
-    def dump(self, file):
+    def dump(self, file: "SupportsWrite[Any]") -> None:
         """
         Dump into file object
         """
@@ -916,13 +934,13 @@ class Delta:
         else:
             file.write(self.dumps())
 
-    def dumps(self):
+    def dumps(self) -> bytes | Any:
         """
         Return the serialized representation of the object as a bytes object, instead of writing it to a file.
         """
         return self.serializer(self.diff)
 
-    def to_dict(self):
+    def to_dict(self) -> dict[Any, Any]:
         return dict(self.diff)
 
     def _flatten_iterable_opcodes(self, _parse_path):
@@ -968,7 +986,7 @@ class Delta:
             yield FlatDeltaRow(**row)
 
     @staticmethod
-    def _from_flat_rows(flat_rows_list: List[FlatDeltaRow]):
+    def _from_flat_rows(flat_rows_list: list[FlatDeltaRow]):
         flat_dict_list = (i._asdict() for i in flat_rows_list)
         return Delta._from_flat_dicts(flat_dict_list)
 
@@ -1081,7 +1099,7 @@ class Delta:
 
         return result
 
-    def to_flat_dicts(self, include_action_in_path=False, report_type_changes=True) -> List[FlatDeltaDict]:
+    def to_flat_dicts(self, include_action_in_path: bool = False, report_type_changes: bool = True) -> list[FlatDeltaDict]:
         """
         Returns a flat list of actions that is easily machine readable.
 
@@ -1094,7 +1112,7 @@ class Delta:
                 {'path': [2], 'value': 3, 'action': 'iterable_item_added'},
             ]
 
-        
+
         **Parameters**
 
         include_action_in_path : Boolean, default=False
@@ -1135,11 +1153,11 @@ class Delta:
             attribute_added
             attribute_removed
         """
-        return cast(List[FlatDeltaDict], [
+        return cast(list[FlatDeltaDict], [
             i._asdict() for i in self.to_flat_rows(include_action_in_path=include_action_in_path, report_type_changes=report_type_changes)
         ])
 
-    def to_flat_rows(self, include_action_in_path=False, report_type_changes=True) -> List[FlatDeltaRow]:
+    def to_flat_rows(self, include_action_in_path: bool = False, report_type_changes: bool = True) -> list[FlatDeltaRow]:
         """
         Just like to_flat_dicts but returns FlatDeltaRow Named Tuples
         """
