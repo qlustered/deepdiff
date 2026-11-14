@@ -90,6 +90,32 @@ class TestDeepHash:
         b_hash = DeepHash(b)
         assert a_hash[a] == b_hash[b]
 
+    @pytest.mark.parametrize('offset', [
+        datetime.timedelta(),
+        datetime.timedelta(hours=1),
+        datetime.timedelta(hours=-5, minutes=-30),
+        datetime.timedelta(microseconds=1),
+    ])
+    def test_timezone_hash_uses_offset(self, offset):
+        zone = datetime.timezone(offset)
+
+        assert DeepHashPrep(zone)[zone] == f'timezone:{offset}'
+
+    def test_timezone_hash_distinguishes_offsets(self):
+        old = datetime.timezone(datetime.timedelta(hours=1))
+        new = datetime.timezone(datetime.timedelta(hours=2))
+
+        assert DeepHash(old)[old] != DeepHash(new)[new]
+
+    @pytest.mark.parametrize('offset', [
+        datetime.timedelta(), datetime.timedelta(hours=1), datetime.timedelta(hours=-5),
+    ])
+    def test_timezone_hash_ignores_name(self, offset):
+        old = datetime.timezone(offset)
+        new = datetime.timezone(offset, 'custom name')
+
+        assert DeepHash(old)[old] == DeepHash(new)[new]
+
     def test_date1(self):
         date = datetime.date(2024, 2, 1)
         date_hash = DeepHash(date)
