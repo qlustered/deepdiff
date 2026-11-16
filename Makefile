@@ -15,7 +15,27 @@ PR_TMP ?= /tmp
 CLAUDE_CMD ?= claude
 SANDBOX := scripts/pr_sandbox
 
-.PHONY: pr-sandbox pr-review pr-clean _require-pr
+.DEFAULT_GOAL := help
+.PHONY: help pr-sandbox pr-review pr-clean _require-pr
+
+help:
+	@echo "Reviewing an outside PR (run from your own dev checkout, in this order):"
+	@echo
+	@echo "  1. make pr-sandbox PR=<N>   Show the PR's changed and risky files (build config, conftest,"
+	@echo "                              CI, agent config, pickles), then after you confirm, run its"
+	@echo "                              tests in the network-less sandbox and report anything"
+	@echo "                              suspicious. Exit status 2 = suspicious behaviour found."
+	@echo "  2. make pr-review  PR=<N>   Start Claude in plan mode (auto/bypass modes locked out) with"
+	@echo "                              a review prompt pointing at the latest sandbox report."
+	@echo "  3. make pr-clean            Delete the fetched PR refs and all sandbox work dirs."
+	@echo
+	@echo "Options:"
+	@echo "  BASE=master                 Branch the PR targets (default: dev)"
+	@echo "  TESTS=\"tests/test_x.py -x\"  pytest arguments for pr-sandbox (default: whole suite)"
+	@echo "  OPTS=\"--fail-on medium\"     Extra sandbox-pr.sh options (--python, --no-strace, --remote)"
+	@echo "  CLAUDE_CMD=...              Command pr-review launches (default: claude from your zsh)"
+	@echo
+	@echo "Details: scripts/pr_sandbox/README.md"
 
 _require-pr:
 	@[[ "$(PR)" =~ ^[0-9]+$$ ]] || { echo "usage: make $(firstword $(MAKECMDGOALS)) PR=<number>" >&2; exit 1; }
