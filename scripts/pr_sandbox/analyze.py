@@ -191,6 +191,8 @@ class Analyzer:
         status = f" ({failed})" if failed else ""
         if not write and (under_any(path, self.allow_roots) or any(under(r, path) for r in self.allow_roots)):
             return  # the read-only venv / interpreter (and the dirs above them), which may live under $HOME
+        if not write and self.is_interpreter_probe(path):
+            return  # CPython's startup search for its stdlib, e.g. ~/lib/python315.zip when Python lives under $HOME
         rel = self.home_rel(path)
 
         if rel is not None and rel != ".":
@@ -233,7 +235,7 @@ class Analyzer:
 
         expected = [
             path == "/", under(path, self.src_root), under_any(path, QUIET_READ_ROOTS),
-            under_any(path, self.allow_roots), bool(INTERPRETER_PROBE_RE.search(path)),
+            under_any(path, self.allow_roots), self.is_interpreter_probe(path),
         ]
         if any(expected):
             return
@@ -244,6 +246,14 @@ class Analyzer:
         else:
             self.add(LOW, "unexpected-read", f"access to {path}{status}", source, example)
         self.unexpected_paths[path] += 1
+
+    def is_interpreter_probe(self, path):
+        """CPython looks for <prefix>/lib/pythonXY.zip etc. in every directory above its executable."""
+        m = INTERPRETER_PROBE_RE.search(path)
+        if not m:
+            return False
+        prefix = path[:m.start()] or "/"
+        return any(under(root, prefix) for root in self.allow_roots)
 
     def is_python(self, path):
         return looks_like_python(path) and under_any(path, self.allow_roots + ["/usr/bin"])
