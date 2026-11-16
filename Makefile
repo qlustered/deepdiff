@@ -1,7 +1,7 @@
 # Reviewing outside PRs. See scripts/pr_sandbox/README.md.
 #
 #   make pr-sandbox PR=612                  # 1. triage risky files, run the PR's tests in the sandbox
-#   make pr-review  PR=612                  # 2. start Claude (plan mode, auto mode locked out) on it
+#   make pr-review  PR=612                  # 2. start Claude on it: read-only, never prompts
 #   make pr-clean                           # 3. delete fetched PR refs and sandbox work dirs
 #
 # Options: BASE=master                 branch the PR targets (default: dev)
@@ -25,8 +25,9 @@ help:
 	@echo "                              CI, agent config, pickles), then after you confirm, run its"
 	@echo "                              tests in the network-less sandbox and report anything"
 	@echo "                              suspicious. Exit status 2 = suspicious behaviour found."
-	@echo "  2. make pr-review  PR=<N>   Start Claude in plan mode (auto/bypass modes locked out) with"
-	@echo "                              a review prompt pointing at the latest sandbox report."
+	@echo "  2. make pr-review  PR=<N>   Start Claude on the PR and its latest sandbox report. It can"
+	@echo "                              read and search freely without asking; everything else"
+	@echo "                              (running code, network, edits) is refused automatically."
 	@echo "  3. make pr-clean            Delete the fetched PR refs and all sandbox work dirs."
 	@echo
 	@echo "Options:"
@@ -45,9 +46,11 @@ pr-sandbox: _require-pr
 		--out "$(PR_TMP)/deepdiff-pr-$(PR)-$$(date +%Y%m%d-%H%M%S)" $(OPTS) $(PR) $(if $(TESTS),-- $(TESTS))
 
 # Runs your `claude` from an interactive zsh so the zshrc wrapper (which switches to
-# ai_agent) is used. --permission-mode plan beats the user-level "auto" default, and
-# review-settings.json disables auto/bypass mode for the session, makes risky commands
-# ask first, and adds a hook that blocks every tool call if auto/bypass mode is ever active.
+# ai_agent) is used. --permission-mode dontAsk beats the user-level "auto" default: reads in
+# the repo and the sandbox work dir (--add-dir), read-only commands and `gh pr view/diff`
+# run without prompts; anything else is refused instead of prompting. review-settings.json
+# also denies code execution, network, edits and PR-mutating gh commands outright, disables
+# auto/bypass mode, and adds a hook that blocks every tool call if they're ever active.
 # Nothing is written to .claude/settings.local.json, so your normal sessions keep auto mode.
 pr-review: _require-pr
 	@report=$$(ls -dt "$(PR_TMP)"/deepdiff-pr-$(PR)-*/report 2>/dev/null | head -1); \
@@ -56,8 +59,8 @@ pr-review: _require-pr
 	fi; \
 	echo "==> reviewing PR $(PR) with report $$report"; \
 	prompt=$$(sed -e "s|{PR}|$(PR)|g" -e "s|{REPORT}|$$report|g" $(SANDBOX)/review-prompt.md); \
-	zsh -ic '$(CLAUDE_CMD) --permission-mode plan --settings "$$1" "$$2"' _ \
-		"$(CURDIR)/$(SANDBOX)/review-settings.json" "$$prompt"
+	zsh -ic '$(CLAUDE_CMD) --permission-mode dontAsk --settings "$$1" --add-dir "$$2" "$$3"' _ \
+		"$(CURDIR)/$(SANDBOX)/review-settings.json" "$$(dirname "$$report")" "$$prompt"
 
 pr-clean:
 	git for-each-ref --format='%(refname)' refs/pr-sandbox | xargs -r -n1 git update-ref -d

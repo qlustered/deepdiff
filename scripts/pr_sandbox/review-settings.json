@@ -1,9 +1,19 @@
 {
   "permissions": {
-    "defaultMode": "plan",
+    "defaultMode": "dontAsk",
     "disableAutoMode": "disable",
     "disableBypassPermissionsMode": "disable",
-    "ask": [
+    "allow": [
+      "Bash(gh pr view:*)",
+      "Bash(gh pr diff:*)",
+      "Bash(gh pr checks:*)"
+    ],
+    "deny": [
+      "Edit",
+      "Write",
+      "NotebookEdit",
+      "WebFetch",
+      "WebSearch",
       "Bash(python:*)",
       "Bash(python3:*)",
       "Bash(pytest:*)",
@@ -20,9 +30,13 @@
       "Bash(git worktree:*)",
       "Bash(git pull:*)",
       "Bash(git fetch:*)",
+      "Bash(git push:*)",
       "Bash(gh pr checkout:*)",
-      "Bash(gh api:*)",
-      "WebFetch"
+      "Bash(gh pr comment:*)",
+      "Bash(gh pr review:*)",
+      "Bash(gh pr merge:*)",
+      "Bash(gh pr edit:*)",
+      "Bash(gh api:*)"
     ]
   },
   "hooks": {

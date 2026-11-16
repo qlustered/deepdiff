@@ -18,12 +18,16 @@ make pr-clean               # delete fetched PR refs and sandbox work dirs
 
 `make pr-review` runs your `claude` command from an interactive zsh, so a zshrc wrapper
 (e.g. one that switches user) is used. It needs that wrapper to pass its arguments through
-and keep the current directory. It starts Claude with `--permission-mode plan` and
-`--settings scripts/pr_sandbox/review-settings.json`, which:
-- turns off auto and bypass mode for that session
-- makes risky commands (`python`, `pytest`, `uv`, `rm`, `git checkout`, `gh api`...) ask first
-- adds a hook (`review-guard.py`) that blocks every tool call if the session is ever in
-  auto or bypass mode
+and keep the current directory. It starts Claude in `dontAsk` mode with
+`--settings scripts/pr_sandbox/review-settings.json`, and adds the sandbox work dir with `--add-dir`:
+- reading and searching the repo and the report, read-only commands, and
+  `gh pr view/diff/checks` run **without prompts**
+- anything else is **refused automatically** instead of asking you, and running code
+  (`python`, `pytest`, `uv`, `make`...), network (`curl`, `gh api`, web fetches), edits and
+  PR-changing `gh` commands are denied outright
+- auto and bypass modes are disabled for the session
+- a hook (`review-guard.py`) blocks every tool call if the session is ever in auto or bypass
+  mode
 
 The initial prompt comes from `review-prompt.md`. Nothing is written to
 `.claude/settings.local.json`, so your other sessions keep their mode. Options:
