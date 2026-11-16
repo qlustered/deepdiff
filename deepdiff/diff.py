@@ -44,6 +44,7 @@ from deepdiff.deephash import DeepHash, combine_hashes_lists
 from deepdiff.base import Base
 from deepdiff.lfucache import LFUCache, DummyLFU
 from deepdiff.colored_view import ColoredView
+from deepdiff.match_keys import CompiledMatchKeys, KeySpec, get_key_matching_pairs
 from deepdiff._multiprocessing import (
     normalize_mp_config, compute_distances_parallel,
     compute_hashes_parallel, compute_subtree_diffs_parallel,
@@ -187,6 +188,7 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
                  include_obj_callback_strict: Optional[Callable]=None,
                  include_paths: Union[str, List[str], None]=None,
                  iterable_compare_func: Optional[Callable]=None,
+                 iterable_match_keys: Optional[Mapping[str, KeySpec]]=None,
                  log_frequency_in_sec: int=0,
                  log_scale_similarity_threshold: float=0.1,
                  log_stacktrace: bool=False,
@@ -216,6 +218,8 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
         # that may receive _parameters without these keys.
         self.exclude_glob_paths = None
         self.include_glob_paths = None
+        self.iterable_match_keys = None
+        self._compiled_match_keys = None
         if kwargs:
             raise ValueError((
                 "The following parameter(s) are not valid: %s\n"
@@ -226,7 +230,8 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
                 "view, hasher, hashes, max_passes, max_diffs, zip_ordered_iterables, "
                 "cutoff_distance_for_pairs, cutoff_intersection_for_pairs, log_frequency_in_sec, cache_size, "
                 "cache_tuning_sample_size, get_deep_distance, group_by, group_by_sort_key, cache_purge_level, log_stacktrace,"
-                "math_epsilon, iterable_compare_func, use_enum_value, _original_type, threshold_to_diff_deeper, default_timezone "
+                "math_epsilon, iterable_compare_func, iterable_match_keys, use_enum_value, _original_type, "
+                "threshold_to_diff_deeper, default_timezone "
                 "ignore_order_func, custom_operators, encodings, ignore_encoding_errors, use_log_scale, log_scale_similarity_threshold "
                 "multiprocessing, multiprocessing_workers, multiprocessing_threshold, "
                 "_parameters and _shared_parameters.") % ', '.join(kwargs.keys()))
@@ -282,6 +287,8 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
             self.include_obj_callback_strict = include_obj_callback_strict
             self.number_to_string = number_to_string_func or number_to_string
             self.iterable_compare_func = iterable_compare_func
+            self.iterable_match_keys = iterable_match_keys
+            self._compiled_match_keys = CompiledMatchKeys(iterable_match_keys) if iterable_match_keys else None
             self.zip_ordered_iterables = zip_ordered_iterables
             self.ignore_private_variables = ignore_private_variables
             self.ignore_nan_inequality = ignore_nan_inequality
@@ -865,10 +872,26 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
 
     def _diff_iterable(self, level: Any, parents_ids: FrozenSet[int]=frozenset(), _original_type: Optional[type]=None, local_tree: Optional[Any]=None) -> None:
         """Difference of iterables"""
-        if (self.ignore_order_func and self.ignore_order_func(level)) or self.ignore_order:
+        match_key_spec = self._get_iterable_match_key_spec(level)
+        ignore_order = bool((self.ignore_order_func and self.ignore_order_func(level)) or self.ignore_order)
+        if match_key_spec is not None:
+            # Lists selected by iterable_match_keys are paired by key, even when ignore_order applies.
+            # With ignore_order, a key-paired item at a different index is not reported as moved.
+            self._diff_iterable_in_order(
+                level, parents_ids, _original_type=_original_type, local_tree=local_tree,
+                match_key_spec=match_key_spec, report_moves=not ignore_order)
+        elif ignore_order:
             self._diff_iterable_with_deephash(level, parents_ids, _original_type=_original_type, local_tree=local_tree)
         else:
             self._diff_iterable_in_order(level, parents_ids, _original_type=_original_type, local_tree=local_tree)
+
+    def _get_iterable_match_key_spec(self, level: Any) -> Optional[KeySpec]:
+        """The iterable_match_keys key spec for the list at this level, if any."""
+        if self._compiled_match_keys is None:
+            return None
+        if not (isinstance(level.t1, Sequence) and isinstance(level.t2, Sequence)):
+            return None
+        return self._compiled_match_keys.get_spec(level.path())
 
     def _compare_in_order(
         self, level,
@@ -893,7 +916,8 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
     def _get_matching_pairs(
         self, level,
         t1_from_index=None, t1_to_index=None,
-        t2_from_index=None, t2_to_index=None
+        t2_from_index=None, t2_to_index=None,
+        match_key_spec: Optional[KeySpec]=None,
     ) -> List[Tuple[Tuple[int, int], Tuple[Any, Any]]]:
         """
         Given a level get matching pairs. This returns list of two tuples in the form:
@@ -901,9 +925,12 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
           (t1 index, t2 index), (t1 item, t2 item)
         ]
 
-        This will compare using the passed in `iterable_compare_func` if available.
+        If the list is selected by `iterable_match_keys`, items are paired by key.
+        Otherwise this will compare using the passed in `iterable_compare_func` if available.
         Default it to compare in order
         """
+        if match_key_spec is not None:
+            return get_key_matching_pairs(level.t1, level.t2, match_key_spec)
 
         if self.iterable_compare_func is None:
             # Match in order if there is no compare function provided
@@ -914,7 +941,6 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
             )
         try:
             matches = []
-            y_matched = set()
             y_index_matched = set()
             for i, x in enumerate(level.t1):
                 x_found = False
@@ -927,13 +953,7 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
                         continue
 
                     if(self.iterable_compare_func(x, y, level)):
-                        deep_hash = DeepHash(y,
-                                             hashes=self.hashes,
-                                             apply_hash=True,
-                                             **self.deephash_parameters,
-                                             )
                         y_index_matched.add(j)
-                        y_matched.add(deep_hash[y])
                         matches.append(((i, j), (x, y)))
                         x_found = True
                         break
@@ -941,13 +961,9 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
                 if(not x_found):
                     matches.append(((i, -1), (x, ListItemRemovedOrAdded)))
             for j, y in enumerate(level.t2):
-
-                deep_hash = DeepHash(y,
-                                     hashes=self.hashes,
-                                     apply_hash=True,
-                                     **self.deephash_parameters,
-                                     )
-                if(deep_hash[y] not in y_matched):
+                # Track matched t2 items by index, not by content: an unmatched item
+                # with the same content as a matched one still has to be reported (#665).
+                if j not in y_index_matched:
                     matches.append(((-1, j), (ListItemRemovedOrAdded, y)))
             return matches
         except CannotCompare:
@@ -957,7 +973,10 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
                 t2_from_index=t2_from_index, t2_to_index=t2_to_index
             )
 
-    def _diff_iterable_in_order(self, level, parents_ids=frozenset(), _original_type=None, local_tree=None):
+    def _diff_iterable_in_order(
+        self, level, parents_ids=frozenset(), _original_type=None, local_tree=None,
+        match_key_spec: Optional[KeySpec]=None, report_moves: bool=True,
+    ):
         # We're handling both subscriptable and non-subscriptable iterables. Which one is it?
         subscriptable = self._iterables_subscriptable(level.t1, level.t2)
         if subscriptable:
@@ -972,6 +991,8 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
             and self._all_values_basic_hashable(level.t1)
             and self._all_values_basic_hashable(level.t2)
             and self.iterable_compare_func is None
+            and match_key_spec is None
+            and not (self._compiled_match_keys is not None and self._is_inside_moved_item(level))
         ):
             local_tree_pass = TreeResult()
             opcodes_with_values = self._diff_ordered_iterable_by_difflib(
@@ -1005,7 +1026,29 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
                 _original_type=_original_type,
                 child_relationship_class=child_relationship_class,
                 local_tree=local_tree,
+                match_key_spec=match_key_spec,
+                report_moves=report_moves,
             )
+
+    @staticmethod
+    def _is_inside_moved_item(level: Any) -> bool:
+        """Whether this level is inside a list item that was paired with an item at a different index.
+
+        Paths inside such items are reported relative to t2 at the moved level (see DiffLevel.path).
+        The opcodes of a list diffed by difflib would be stored under such a path, which Delta can't apply,
+        so lists inside moved items are diffed pair by pair instead, as with iterable_compare_func.
+        """
+        up = level.up
+        while up is not None:
+            if (
+                up.additional.get("moved")
+                and up.t1_child_rel is not None
+                and up.t2_child_rel is not None
+                and up.t1_child_rel.param != up.t2_child_rel.param
+            ):
+                return True
+            up = up.up
+        return False
 
     def _all_values_basic_hashable(self, iterable: Iterable[Any]) -> bool:
         """
@@ -1026,11 +1069,15 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
         _original_type=None, child_relationship_class=None,
         t1_from_index=None, t1_to_index=None,
         t2_from_index=None, t2_to_index=None,
+        match_key_spec: Optional[KeySpec]=None, report_moves: bool=True,
     ):
+        # Items are paired by a custom criterion rather than by position or equality.
+        custom_pairing = match_key_spec is not None or self.iterable_compare_func is not None
         for (i, j), (x, y) in self._get_matching_pairs(
             level,
             t1_from_index=t1_from_index, t1_to_index=t1_to_index,
-            t2_from_index=t2_from_index, t2_to_index=t2_to_index
+            t2_from_index=t2_from_index, t2_to_index=t2_to_index,
+            match_key_spec=match_key_spec,
         ):
             if self._count_diff() is StopIteration:
                 return  # pragma: no cover. This is already covered for addition.
@@ -1045,6 +1092,7 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
                     child_relationship_param=reference_param1,
                     child_relationship_param2=reference_param2,
                     )
+                change_level.paired_by_key = match_key_spec is not None
                 self._report_result('iterable_item_removed', change_level, local_tree=local_tree)
 
             elif x is ListItemRemovedOrAdded:  # new item added
@@ -1055,10 +1103,11 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
                     child_relationship_param=reference_param1,
                     child_relationship_param2=reference_param2,
                     )
+                change_level.paired_by_key = match_key_spec is not None
                 self._report_result('iterable_item_added', change_level, local_tree=local_tree)
 
             else:  # check if item value has changed
-                if (i != j and ((x == y) or self.iterable_compare_func)):
+                if (i != j and report_moves and ((x == y) or custom_pairing)):
                     # Item moved
                     change_level = level.branch_deeper(
                         x,
@@ -1069,9 +1118,10 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
                     )
                     self._report_result('iterable_item_moved', change_level, local_tree=local_tree)
 
-                    if self.iterable_compare_func:
+                    if custom_pairing:
                         # Mark additional context denoting that we have moved an item.
-                        # This will allow for correctly setting paths relative to t2 when using an iterable_compare_func
+                        # This will allow for correctly setting paths relative to t2 when using
+                        # an iterable_compare_func or iterable_match_keys
                         level.additional["moved"] = True
 
                     else:
@@ -1604,6 +1654,8 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
           on the wrong paths.
         - ``ignore_order_func`` is also called with the level and would see
           worker-local paths.
+        - ``iterable_match_keys`` selects lists by their absolute path, which
+          a worker can't see.
 
         Path-only filters (``exclude_paths`` / ``include_paths`` /
         ``exclude_regex_paths``) are handled by re-applying ``_skip_this``
@@ -1616,6 +1668,8 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
         if self.include_obj_callback or self.include_obj_callback_strict:
             return False
         if self.ignore_order_func:
+            return False
+        if self._compiled_match_keys is not None:
             return False
         return True
 

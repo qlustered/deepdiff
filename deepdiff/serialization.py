@@ -311,7 +311,9 @@ class SerializationMixin:
             # and will be omitted when counting distance. (Look inside the distance module.)
             result['_numpy_paths'] = self._numpy_paths  # type: ignore
 
-        if self.iterable_compare_func:  # type: ignore
+        if self.iterable_compare_func or (self.iterable_match_keys and not self.ignore_order):  # type: ignore
+            # Paths inside moved items are reported relative to t2 and Delta needs to know that.
+            # iterable_match_keys doesn't report moves when ignore_order=True.
             result['_iterable_compare_func_was_used'] = True
 
         return deepcopy(dict(result))

@@ -17,7 +17,7 @@ is implemented for the `ignore_order=True` hot path. After
 `_get_most_in_common_pairs_in_iterables` decides pairs, each paired
 `_diff(change_level, ...)` call inside `_diff_iterable_with_deephash` is
 deferred into a job queue. When the queue is above threshold and the run is
-"subtree-safe" (no `custom_operators`, no `*_obj_callback*`, no
+"subtree-safe" (no `custom_operators`, no `*_obj_callback*`, no `iterable_match_keys`, no
 `ignore_order_func`), a `ProcessPoolExecutor` runs them in workers; otherwise
 the deferred jobs run inline-equivalent in the parent. Each worker returns the
 leaves of its subtree-local `TreeResult`; the parent splices each leaf's

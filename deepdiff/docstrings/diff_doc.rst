@@ -158,6 +158,10 @@ iterable_compare_func:
     :ref:`iterable_compare_func_label`:
     There are times that we want to guide DeepDiff as to what items to compare with other items. In such cases we can pass a iterable_compare_func that takes a function pointer to compare two items. The function takes three parameters (x, y, level) and should return True if it is a match, False if it is not a match or raise CannotCompare if it is unable to compare the two.
 
+iterable_match_keys: Dictionary, default = None
+    :ref:`iterable_match_keys_label`:
+    Match the items of specific lists by a key instead of by position. Maps a path (exact or glob, e.g. ``"root['orders'][*]['lines']"``) to a key spec: a key name such as ``"id"``, a tuple of key names for a composite key, or a callable that takes an item and returns its key. Inserted, removed and reordered records are then reported per record, at real list indexes, and Delta can be applied to the original object.
+
 
 log_frequency_in_sec: Integer, default = 0
     :ref:`log_frequency_in_sec_label`
