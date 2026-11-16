@@ -1,0 +1,26 @@
+name: PR risk labels
+
+# Labels PRs that touch build config, the test harness, CI, agent config, pickles or the
+# sandbox tooling (see .github/labeler.yml).
+#
+# pull_request_target runs this file and labeler.yml as they are on the BASE branch, with a
+# token that can write labels, so a PR can't edit its way out of being labelled. That is
+# only safe because nothing here checks out or runs the PR's code. NEVER add a checkout of
+# the PR head, or any step that builds/tests it, to this workflow.
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+    branches: [master, dev]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/labeler@bf12e9b00b37c5c0ca2b87b79b2daf7891dbda13 # v7.0.0
+        with:
+          sync-labels: true

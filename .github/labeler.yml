@@ -1,0 +1,59 @@
+# Labels for PRs that touch files which execute code, configure agents, or change CI.
+# Applied by .github/workflows/pr-risk-label.yml. Keep in sync with RISKY in
+# scripts/pr_sandbox/sandbox-pr.sh. Because that workflow runs on pull_request_target,
+# this file is read from the base branch, so a PR can't change its own labels.
+
+'risk: build-config':
+  - changed-files:
+      - any-glob-to-any-file:
+          - pyproject.toml
+          - uv.lock
+          - setup.py
+          - setup.cfg
+          - '**/requirements*.txt'
+          - noxfile.py
+          - tox.ini
+          - Makefile
+          - mypy.ini
+          - 'pyrightconfig.json*'
+          - .pre-commit-config.yaml
+          - MANIFEST.in
+
+'risk: test-harness':
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/conftest.py'
+          - pytest.ini
+
+'risk: serialized-fixtures':
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/*.pickle'
+          - '**/*.pkl'
+
+'risk: ci':
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/**'
+          - .gitattributes
+          - .gitmodules
+
+'risk: agent-config':
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.claude/**'
+          - '**/CLAUDE.md'
+          - '**/CLAUDE.local.md'
+          - '**/AGENTS.md'
+          - .mcp.json
+          - '.cursor/**'
+          - .cursorrules
+          - '.vscode/**'
+          - '.idea/**'
+          - '.envrc*'
+          - '.direnvrc*'
+
+'risk: sandbox-tooling':
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'scripts/**'
