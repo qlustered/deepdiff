@@ -53,7 +53,16 @@ jobs:
 
       - name: Run the PR's tests in the sandbox
         run: |
-          trusted/scripts/pr_sandbox/run-sandboxed.sh \
+          tooling=trusted/scripts/pr_sandbox
+          if [ ! -x "$tooling/run-sandboxed.sh" ]; then
+            # Bootstrap only: the base commit predates this tooling (i.e. the PR that adds it).
+            # Fall back to the PR's own copy, which means this run's verdict can't be trusted.
+            msg="Base commit has no scripts/pr_sandbox; used the PR's own copy, so this verdict is NOT trustworthy."
+            echo "::warning::$msg"
+            echo "> **Warning:** $msg" >> "$GITHUB_STEP_SUMMARY"
+            tooling=untrusted/scripts/pr_sandbox
+          fi
+          "$tooling/run-sandboxed.sh" \
             --monitor-only --python 3.15 --out "$RUNNER_TEMP/pr-sandbox" untrusted
 
       - name: Publish report
