@@ -14,6 +14,10 @@
 #   --monitor-only     exit status reflects only the findings, not test failures (for CI)
 #   --no-strace        skip syscall tracing (faster; detection then relies on the in-process audit hook)
 #
+# Environment:
+#   PR_SANDBOX_SHARE_GROUP   group to make the reports readable by (default: ai-dev, if it exists
+#                            and you're a member; "" disables)
+#
 # Exit status: 2 if findings reached --fail-on, otherwise pytest's exit status (0 with --monitor-only).
 #
 # The sandbox: no network (own empty network namespace), own PID/IPC/UTS namespaces, read-only
@@ -38,7 +42,7 @@ while [[ $# -gt 0 ]]; do
         --fail-on) FAIL_ON=$2; shift 2 ;;
         --monitor-only) MONITOR_ONLY=1; shift ;;
         --no-strace) USE_STRACE=0; shift ;;
-        -h|--help) sed -n '2,24p' "$0"; exit 0 ;;
+        -h|--help) sed -n '2,25p' "$0"; exit 0 ;;
         --) die "SRC_DIR must come before --" ;;
         -*) die "unknown option $1" ;;
         *) break ;;
@@ -64,6 +68,24 @@ WORK=$(cd "$OUT" && pwd)
 mkdir -p "$WORK"/{src,home,audit,etc,report}
 REPORT=$WORK/report
 echo "==> work dir: $WORK"
+
+# Make the reports readable by a shared group, e.g. so an agent running as another user can
+# read them. Defaults to "ai-dev" if that group exists and you're in it. Set
+# PR_SANDBOX_SHARE_GROUP to another group, or to "" to turn this off.
+SHARE_GROUP=${PR_SANDBOX_SHARE_GROUP-ai-dev}
+share_reports() {
+    [[ -n $SHARE_GROUP ]] || return 0
+    getent group "$SHARE_GROUP" >/dev/null || return 0
+    id -nG | tr ' ' '\n' | grep -qx -- "$SHARE_GROUP" || return 0
+    # The work dir itself only needs traverse+list; src/ and home/ stay private.
+    chgrp "$SHARE_GROUP" "$WORK" && chmod g+rx "$WORK" || return 0
+    local d
+    for d in "$REPORT" "$WORK/audit"; do
+        chgrp -R "$SHARE_GROUP" "$d" && chmod -R g+rX "$d" || true
+    done
+    echo "==> reports shared with group $SHARE_GROUP"
+}
+trap share_reports EXIT
 
 # ---------------------------------------------------------------------------
 # 1. Dependencies: from the TRUSTED lockfile only (the PR's pyproject.toml/uv.lock are never
