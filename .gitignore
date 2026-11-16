@@ -75,3 +75,6 @@ pyrightconfig.json
 
 # direnv file
 .envrc
+
+# Personal Claude Code instructions
+CLAUDE.local.md
