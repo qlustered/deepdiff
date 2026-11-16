@@ -1,0 +1,41 @@
+{
+  "permissions": {
+    "defaultMode": "plan",
+    "disableAutoMode": "disable",
+    "disableBypassPermissionsMode": "disable",
+    "ask": [
+      "Bash(python:*)",
+      "Bash(python3:*)",
+      "Bash(pytest:*)",
+      "Bash(uv:*)",
+      "Bash(pip:*)",
+      "Bash(nox:*)",
+      "Bash(make:*)",
+      "Bash(rm:*)",
+      "Bash(source:*)",
+      "Bash(curl:*)",
+      "Bash(wget:*)",
+      "Bash(git checkout:*)",
+      "Bash(git switch:*)",
+      "Bash(git worktree:*)",
+      "Bash(git pull:*)",
+      "Bash(git fetch:*)",
+      "Bash(gh pr checkout:*)",
+      "Bash(gh api:*)",
+      "WebFetch"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -I \"$CLAUDE_PROJECT_DIR/scripts/pr_sandbox/review-guard.py\""
+          }
+        ]
+      }
+    ]
+  }
+}

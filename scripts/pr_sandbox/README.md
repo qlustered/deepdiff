@@ -8,6 +8,29 @@ handing it your SSH keys, PyPI token or shell config, and they tell you if it tr
 Requirements: `bwrap` (bubblewrap), `strace`, `uv`, `python3`. On Ubuntu:
 `sudo apt install bubblewrap strace`.
 
+The usual flow, from your own `dev` checkout:
+
+```bash
+make pr-sandbox PR=612      # triage risky files, then run the PR's tests in the sandbox
+make pr-review  PR=612      # start Claude on the PR and its sandbox report, auto mode locked out
+make pr-clean               # delete fetched PR refs and sandbox work dirs
+```
+
+`make pr-review` runs your `claude` command from an interactive zsh, so a zshrc wrapper
+(e.g. one that switches user) is used. It needs that wrapper to pass its arguments through
+and keep the current directory. It starts Claude with `--permission-mode plan` and
+`--settings scripts/pr_sandbox/review-settings.json`, which:
+- turns off auto and bypass mode for that session
+- makes risky commands (`python`, `pytest`, `uv`, `rm`, `git checkout`, `gh api`...) ask first
+- adds a hook (`review-guard.py`) that blocks every tool call if the session is ever in
+  auto or bypass mode
+
+The initial prompt comes from `review-prompt.md`. Nothing is written to
+`.claude/settings.local.json`, so your other sessions keep their mode. Options:
+`BASE=master`, `TESTS="tests/test_x.py -x"`, `OPTS="--fail-on medium"`, `CLAUDE_CMD=...`.
+
+The scripts can also be run directly:
+
 ```bash
 # From YOUR checkout (dev or master), never from inside a PR checkout:
 scripts/pr_sandbox/sandbox-pr.sh 660                     # review risky files, then run the tests
@@ -97,7 +120,7 @@ to steer an agent. Keep the agent that reads untrusted text away from the combin
 - **Don't use auto/YOLO modes when reviewing outside PRs.** Use plan mode or default
   permission prompts, and run any PR code only through `sandbox-pr.sh`.
 - **Enable Claude Code's Bash sandbox** (`/sandbox`), so any command the agent runs is limited
-  to the working directory and allowed network hosts.
+  to the working directory and allowed network hosts. On Linux it needs `bubblewrap` and `socat`.
 - **Or review in the cloud** (`/code-review ultra <N>`), where an injection can't reach this
   machine.
 - **An agent saying "this PR is safe" is not a gate.** The risk labels, the risky-file diff and
