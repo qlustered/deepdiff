@@ -424,5 +424,5 @@ class TestOperators:
                 return obj
 
         diff3 = DeepDiff(deepcopy(d1), deepcopy(d2), ignore_order=True, custom_operators=[RemoveGUIDsOperatorIgnoreOrderReady(types=[str])])
-        assert not diff3, "We shouldn't have a diff because we have normalized the string values to be all the same vlues."
+        assert not diff3, "We shouldn't have a diff because we have normalized the string values to be all the same values."
 
