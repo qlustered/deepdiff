@@ -8,10 +8,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      DEFAULT_PYTHON: '3.14'
+      DEFAULT_PYTHON: '3.15'
     strategy:
       matrix:
-        python-version: ['3.10','3.11','3.12','3.13','3.14']
+        python-version: ['3.11','3.12','3.13','3.14','3.15']
         architecture: ['x64']
 
     steps:
@@ -26,21 +26,21 @@ jobs:
           cache-dependency-path: pyproject.toml
 
       - name: Install nox
-        run: pip install nox==2025.5.1
+        run: pip install nox==2026.10.20
 
       - name: Lint with flake8
-        if: ${{ matrix.python-version == '3.14' }}
+        if: ${{ matrix.python-version == '3.15' }}
         run: |
           nox -s flake8 -- deepdiff --count --select=E9,F63,F7,F82 --show-source --statistics
           nox -s flake8 -- deepdiff --count --exit-zero --max-complexity=26 --max-line-length=250 --statistics
 
       - name: Test with pytest (no coverage)
-        if: ${{ matrix.python-version != '3.14' }}
+        if: ${{ matrix.python-version != '3.15' }}
         run: |
           nox -s pytest-${{ matrix.python-version }} -- --benchmark-disable tests/
 
       - name: Test with pytest (+ coverage)
-        if: ${{ matrix.python-version == '3.14' }}
+        if: ${{ matrix.python-version == '3.15' }}
         run: |
           nox -s pytest-${{ matrix.python-version }} -- \
             --benchmark-disable \
@@ -49,7 +49,7 @@ jobs:
             tests/ --runslow
 
       - name: Upload coverage
-        if: ${{ matrix.python-version == '3.14' }}
+        if: ${{ matrix.python-version == '3.15' }}
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}

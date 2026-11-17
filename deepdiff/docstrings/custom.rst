@@ -10,6 +10,9 @@ Iterable Compare Func
 
 New in DeepDiff 5.5.0
 
+.. note::
+    If list items are identified by a key such as ``id``, :ref:`iterable_match_keys_label` does the same job without a compare function, and is faster on long lists.
+
 There are times that we want to guide DeepDiff as to what items to compare with other items. In such cases we can pass a `iterable_compare_func` that takes a function pointer to compare two items. The function takes three parameters (x, y, level) and should return `True` if it is a match, `False` if it is not a match or raise `CannotCompare` if it is unable to compare the two.
 
 

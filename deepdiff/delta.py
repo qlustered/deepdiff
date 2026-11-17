@@ -556,12 +556,19 @@ class Delta:
 
     def _do_values_or_type_changed(self, changes, is_type_change=False, verify_changes=True):
         compare_func_was_used = self.diff.get('_iterable_compare_func_was_used', False)
+        opcode_list_paths = None
+        if compare_func_was_used and self.diff.get('_iterable_opcodes'):
+            opcode_list_paths = {tuple(_path_to_elements(i)) for i in self.diff['_iterable_opcodes']}
         for path, value in changes.items():
-            # When iterable_compare_func is used, DiffLevel.path() inverts use_t2 for
+            # When iterable_compare_func or iterable_match_keys is used, DiffLevel.path() inverts use_t2 for
             # moved items (see model.py DiffLevel.path). This means dict keys here are
             # actually t2 paths and new_path holds the t1 path. Apply at t1 so we
             # don't access indices that don't exist yet or modify the wrong item.
-            apply_path = value['new_path'] if (compare_func_was_used and value.get('new_path')) else path
+            # Items of lists diffed by opcodes are never treated as moved, so their path is already the t1 path.
+            apply_path = path
+            if compare_func_was_used and value.get('new_path'):
+                if not (opcode_list_paths and tuple(_path_to_elements(path))[:-1] in opcode_list_paths):
+                    apply_path = value['new_path']
             elem_and_details = self._get_elements_and_details(apply_path)
             if elem_and_details:
                 elements, parent, parent_to_obj_elem, parent_to_obj_action, obj, elem, action = elem_and_details

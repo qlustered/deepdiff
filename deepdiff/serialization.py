@@ -311,7 +311,9 @@ class SerializationMixin:
             # and will be omitted when counting distance. (Look inside the distance module.)
             result['_numpy_paths'] = self._numpy_paths  # type: ignore
 
-        if self.iterable_compare_func:  # type: ignore
+        if self.iterable_compare_func or (self.iterable_match_keys and not self.ignore_order):  # type: ignore
+            # Paths inside moved items are reported relative to t2 and Delta needs to know that.
+            # iterable_match_keys doesn't report moves when ignore_order=True.
             result['_iterable_compare_func_was_used'] = True
 
         return deepcopy(dict(result))
@@ -539,15 +541,9 @@ def load_path_content(path, file_type=None):
         with open(path, 'r') as the_file:
             content = yaml.safe_load(the_file)
     elif file_type == 'toml':
-        try:
-            if sys.version_info >= (3, 11):
-                import tomllib as tomli
-            else:
-                import tomli
-        except ImportError:  # pragma: no cover.
-            raise ImportError('On python<=3.10 tomli needs to be installed.') from None  # pragma: no cover.
+        import tomllib
         with open(path, 'rb') as the_file:
-            content = tomli.load(the_file)
+            content = tomllib.load(the_file)
     elif file_type == 'pickle':
         with open(path, 'rb') as the_file:
             content = the_file.read()
