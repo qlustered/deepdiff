@@ -683,6 +683,9 @@ class DeepHash(Base):
         elif isinstance(obj, datetime.date):
             result = self._prep_date(obj)
 
+        elif isinstance(obj, datetime.timezone):
+            result = KEY_TO_VAL_STR.format('timezone', obj.utcoffset(None))
+
         elif isinstance(obj, numbers):  # type: ignore
             result = self._prep_number(obj)
 
