@@ -71,7 +71,7 @@ static = [
   "pydantic~=2.14.3",
 ]
 test = [
-  "pytest~=9.2.1",
+  "pytest~=9.2.0",
   "pytest-benchmark~=5.3.1",
   "pytest-cov~=7.1.0",
   "python-dotenv~=1.2.4",
