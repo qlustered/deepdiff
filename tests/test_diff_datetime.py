@@ -1,5 +1,6 @@
+import pytest
 import pytz
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from deepdiff import DeepDiff
 
 
@@ -123,3 +124,23 @@ class TestDiffDatetime:
         assert not DeepDiff(d1, d2)
         assert not DeepDiff(d1, d2, ignore_order=True)
         assert not DeepDiff(d1, d2, truncate_datetime='second')
+
+    def test_truncate_datetime_with_timedelta(self):
+        """truncate_datetime must not crash on timedelta (no .replace())."""
+        for truncate_datetime in ('second', 'minute', 'hour', 'day'):
+            d1 = {"a": timedelta(days=1)}
+            d2 = {"a": timedelta(days=1)}
+            assert not DeepDiff(d1, d2, truncate_datetime=truncate_datetime)
+            d2 = {"a": timedelta(days=2)}
+            assert DeepDiff(d1, d2, truncate_datetime=truncate_datetime)
+
+    def test_truncate_datetime_with_np_datetime64(self):
+        """truncate_datetime must not crash on np.datetime64 (no .replace())."""
+        np = pytest.importorskip("numpy")
+        from deepdiff import DeepHash
+        for truncate_datetime in ('second', 'minute', 'hour', 'day'):
+            h1 = DeepHash(np.datetime64('2020-05-17'), truncate_datetime=truncate_datetime)
+            h2 = DeepHash(np.datetime64('2020-05-17'), truncate_datetime=truncate_datetime)
+            assert h1 == h2
+            h3 = DeepHash(np.datetime64('2020-05-18'), truncate_datetime=truncate_datetime)
+            assert h1 != h3

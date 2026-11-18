@@ -691,9 +691,10 @@ def datetime_normalize(
         datetime.timezone, "BaseTzInfo"
     ] = datetime.timezone.utc,
 ) -> Any:
-    # A plain date has no time component, so truncation does not apply to it.
-    has_time = not (isinstance(obj, datetime.date) and not isinstance(obj, datetime.datetime))
-    if truncate_datetime and has_time:
+    # Only datetime and time objects carry truncatable time fields. A plain
+    # date has no time component, and other types (e.g. timedelta) do not
+    # support .replace() with time fields, so truncation skips them.
+    if truncate_datetime and isinstance(obj, (datetime.datetime, datetime.time)):
         if truncate_datetime == 'second':
             obj = obj.replace(microsecond=0)
         elif truncate_datetime == 'minute':
