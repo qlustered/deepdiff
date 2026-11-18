@@ -4,7 +4,7 @@ build-backend = "flit_core.buildapi"
 
 [project]
 name = "deepdiff"
-version = "9.2.0"
+version = "9.2.1"
 dependencies = [
   "cachebox>=6.1.2,<7",
   "orderly-set>=5.5.0,<6",
@@ -71,7 +71,7 @@ static = [
   "pydantic~=2.14.3",
 ]
 test = [
-  "pytest~=9.2.0",
+  "pytest~=9.2.1",
   "pytest-benchmark~=5.3.1",
   "pytest-cov~=7.1.0",
   "python-dotenv~=1.2.4",

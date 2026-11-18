@@ -1,6 +1,6 @@
 """This module offers the DeepDiff, DeepSearch, grep, Delta and DeepHash classes."""
 # flake8: noqa
-__version__ = '9.2.0'
+__version__ = '9.2.1'
 import logging
 
 if __name__ == '__main__':

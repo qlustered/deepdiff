@@ -4,7 +4,7 @@
    contain the root `toctree` directive.
 
 
-DeepDiff 9.2.0 documentation!
+DeepDiff 9.2.1 documentation!
 =============================
 
 .. admonition:: DeepDiff is part of Qluster
