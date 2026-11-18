@@ -1,4 +1,5 @@
 import os
+import json
 import pytest
 from shutil import copyfile
 from click.testing import CliRunner
@@ -9,6 +10,28 @@ from deepdiff.helper import pypy3
 
 @pytest.mark.skipif(pypy3, reason='clevercsv is not supported in pypy3')
 class TestCommands:
+
+    @pytest.mark.parametrize('use_orjson', [False, True])
+    def test_diff_command_preserves_unicode(self, tmp_path, monkeypatch, use_orjson):
+        if use_orjson:
+            pytest.importorskip('orjson')
+        else:
+            monkeypatch.setattr('deepdiff.commands.orjson', None)
+            monkeypatch.setattr('deepdiff.serialization.orjson', None)
+        t1 = tmp_path / 'before.json'
+        t2 = tmp_path / 'after.json'
+        t1.write_text(json.dumps({'名前': '東京'}), encoding='utf-8')
+        t2.write_text(json.dumps({'名前': '大阪 😀'}), encoding='utf-8')
+
+        result = CliRunner().invoke(diff, [str(t1), str(t2)])
+
+        assert result.exit_code == 0
+        assert '東京' in result.output
+        assert '大阪 😀' in result.output
+        assert '名前' in result.output
+        assert json.loads(result.output) == {
+            'values_changed': {"root['名前']": {'old_value': '東京', 'new_value': '大阪 😀'}}
+        }
 
     @pytest.mark.parametrize('name1, name2, expected_in_stdout, expected_exit_code', [
         ('t1.json', 't2.json', """dictionary_item_added": {\n    "root[0]['key3']": "value3\"""", 0),
