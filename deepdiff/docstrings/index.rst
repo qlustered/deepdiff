@@ -4,7 +4,7 @@
    contain the root `toctree` directive.
 
 
-DeepDiff 9.1.0 documentation!
+DeepDiff 9.2.0 documentation!
 =============================
 
 .. |qluster_link| raw:: html
