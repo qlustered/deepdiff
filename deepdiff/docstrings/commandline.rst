@@ -14,6 +14,10 @@ The commands are:
 - :ref:`deep_extract_command`
 - :ref:`deep_patch_command`
 
+.. seealso::
+    For CSV or spreadsheet submissions that arrive every cycle and have rows to fix before release, see
+    :doc:`/qluster`.
+
 
 .. _deep_diff_command:
 

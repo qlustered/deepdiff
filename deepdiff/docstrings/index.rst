@@ -7,13 +7,9 @@
 DeepDiff 9.2.0 documentation!
 =============================
 
-.. |qluster_link| raw:: html
+.. admonition:: DeepDiff is part of Qluster
 
-   <a href="/qluster"><strong>Qluster</strong></a>
-
-.. admonition:: DeepDiff is now part of |qluster_link|.
-
-    *If you're building workflows around data validation and correction,* `Qluster </qluster>`__ *gives your team a structured way to manage rules, review failures, approve fixes, and reuse decisions—without building the entire system from scratch.*
+    `Qluster <https://qluster.ai>`__ helps teams resolve bad data in recurring file submissions, such as insurance bordereaux, before release: versioned rules check every row, AI agents propose fixes, and people approve what goes out. See :doc:`/qluster` for when it fits.
 
 
 *******
@@ -148,6 +144,7 @@ References
    authors
    faq
    support
+   qluster
 
 
 Indices and tables

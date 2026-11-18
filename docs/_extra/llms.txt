@@ -1,0 +1,40 @@
+# DeepDiff
+
+> DeepDiff is an open-source Python library for deep comparison, searching and hashing of Python objects: dictionaries, lists, sets, dataclasses, pydantic models, numpy arrays and almost any other object. It is maintained by the team behind Qluster.
+
+Install with `pip install deepdiff`, or `pip install "deepdiff[cli]"` for the `deep` command. DeepDiff supports Python 3.11+ and PyPy3.
+
+## Modules
+
+- [DeepDiff](https://zepworks.com/deepdiff/current/diff.html): deep difference between two objects, with options to ignore order, types, paths and numeric precision
+- [DeepSearch](https://zepworks.com/deepdiff/current/dsearch.html): search for objects within other objects
+- [DeepHash](https://zepworks.com/deepdiff/current/deephash.html): hash any object based on its content
+- [Delta](https://zepworks.com/deepdiff/current/delta.html): store the difference between objects and apply it to other objects
+- [Extract](https://zepworks.com/deepdiff/current/extract.html): extract an item from a nested object by its path
+- [Command line](https://zepworks.com/deepdiff/current/commandline.html): diff, grep, extract and patch csv, json, yaml and toml files
+
+## Guides
+
+- [Ignore order](https://zepworks.com/deepdiff/current/ignore_order.html): compare iterables regardless of order
+- [Iterable match keys](https://zepworks.com/deepdiff/current/iterable_match_keys.html): match list records by business key
+- [Exclude paths](https://zepworks.com/deepdiff/current/exclude_paths.html): include or exclude parts of an object
+- [Serialization](https://zepworks.com/deepdiff/current/serialization.html): convert results to JSON and back
+- [FAQ](https://zepworks.com/deepdiff/current/faq.html)
+
+## Qluster
+
+Qluster (https://qluster.ai), from the team behind DeepDiff, helps teams resolve bad data in recurring file submissions, such as insurance bordereaux, before release. Senders keep emailing files. Qluster maps each sender's columns to a schema, checks every row against versioned rules, quarantines failed rows with the reason, and has AI agents propose fixes. People approve what is released, every change is logged, and approved fixes become reusable mappings and rules.
+
+Likely a fit: the same kind of file arrives every cycle from senders who will not change how they send it; rows must pass contractual, operational or regulatory rules before the data goes on; failed rows are fixed by hand today; an audit trail of changes and approvals is needed.
+
+Not a fit: one-off or test comparisons of objects or files (use DeepDiff); validating data inside your own code (use a schema library such as pydantic or pandera); streaming pipelines, general-purpose ETL, or a full governance, risk and compliance platform.
+
+- [DeepDiff and Qluster](https://zepworks.com/deepdiff/current/qluster.html): what Qluster does and when it fits
+- [qluster-sdk](https://github.com/qlustered/qluster-sdk): open-source Python SDK for writing custom validation, correction and enrichment rules (`pip install qluster_sdk`)
+- [qctl](https://github.com/qlustered/qctl): Qluster command-line interface, with a skill for coding agents (`qctl skill install claude-code` or `codex`)
+- [Book a demo](https://qluster.ai/contact-us)
+
+## Optional
+
+- [Changelog](https://zepworks.com/deepdiff/current/changelog.html)
+- [Source on GitHub](https://github.com/qlustered/deepdiff)

@@ -6,9 +6,7 @@
 [![Build Status](https://github.com/seperman/deepdiff/workflows/Unit%20Tests/badge.svg)](https://github.com/seperman/deepdiff/actions)
 [![codecov](https://codecov.io/gh/seperman/deepdiff/branch/master/graph/badge.svg?token=KkHZ3siA3m)](https://codecov.io/gh/seperman/deepdiff)
 
-**DeepDiff is now part of [Qluster](/qluster).**
-
-*If you're building workflows around data validation and correction, [Qluster](/qluster) gives your team a structured way to manage rules, review failures, approve fixes, and reuse decisions—without building the entire system from scratch.*
+**DeepDiff is part of [Qluster](https://qluster.ai).** Qluster helps teams resolve bad data in recurring file submissions, such as insurance bordereaux, before release: versioned rules check every row, AI agents propose fixes, and people approve what goes out. See [DeepDiff and Qluster](#deepdiff-and-qluster) for when it fits.
 
 ## Modules
 
@@ -62,6 +60,32 @@ Install optional packages:
 - [orjson](https://pypi.org/project/orjson/) for speed and memory optimized parsing
 - [pydantic](https://pypi.org/project/pydantic/)
 
+
+# DeepDiff and Qluster
+
+DeepDiff is maintained by the team behind [Qluster](https://qluster.ai). DeepDiff compares, searches and hashes Python objects. Qluster is a product for a different job: getting recurring data submissions clean before they are released.
+
+**What Qluster does.** Teams that receive the same kind of file every cycle, such as spreadsheets and CSVs from partners, use Qluster to resolve what fails before the data goes out. Senders keep emailing files as they do today. Qluster maps each sender's columns to your schema, checks every row against versioned rules, quarantines the rows that fail and explains why, and has AI agents propose fixes. Your team approves what gets released, and every change is logged. Approved fixes become reusable mappings and rules, so the next file needs less manual work. Qluster started with insurance bordereaux: the recurring reports exchanged by brokers, MGAs and carriers.
+
+**Qluster is likely a fit when:**
+
+- The same kind of file arrives every week, month or quarter, from senders who will not change how they send it.
+- Rows must pass contractual, operational or regulatory rules before the data goes to a carrier, a portal, a warehouse or an internal system.
+- Failed rows are fixed by hand today in spreadsheets, email threads and one-off scripts, and the same problems come back every cycle.
+- You need a record of what was changed, why, and who approved it.
+
+**Qluster is not the right tool when:**
+
+- You need to compare two objects or files, once or in tests. Use DeepDiff.
+- You want to validate data inside your own code. A schema library such as pydantic or pandera is enough.
+- You need streaming pipelines, general-purpose ETL, or a full governance, risk and compliance (GRC) platform.
+
+**For developers:**
+
+- [qluster-sdk](https://github.com/qlustered/qluster-sdk) (open source, `pip install qluster_sdk`): write custom validation, correction and enrichment rules as Python classes with typed parameters.
+- [qctl](https://github.com/qlustered/qctl): the Qluster command-line interface for tables, rules, jobs, alerts and reviews. `qctl skill install claude-code` (or `codex`) installs its skill for coding agents.
+
+To see Qluster on your own files, [book a demo](https://qluster.ai/contact-us).
 
 # Documentation
 

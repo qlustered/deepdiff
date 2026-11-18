@@ -13,6 +13,10 @@ such lists by position produces a cascade of ``values_changed``.
 and you get per-record additions, removals and field changes. The lists stay lists: results are reported at real
 list indexes and a :ref:`delta_label` made from the diff can be applied to the original object.
 
+.. seealso::
+    If these records come from files that arrive every cycle and must pass business rules before release,
+    see :doc:`/qluster`.
+
 iterable_match_keys: Dictionary, default = None
     Maps a path to a key spec. Only the lists at the given paths are matched by key.
 
