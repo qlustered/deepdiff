@@ -28,6 +28,16 @@ from tests import PicklableClass, parameterize_cases, CustomClass, CustomClass2
 
 class TestBasicsOfDelta:
 
+    @pytest.mark.parametrize('before', [{}, {'items': None}, {'items': []}])
+    def test_new_mutable_values_are_independent_between_applications(self, before):
+        after = {'items': [{'values': []}]}
+        delta = Delta(DeepDiff(before, after))
+        first = copy.deepcopy(before) + delta
+        second = copy.deepcopy(before) + delta
+        first['items'][0]['values'].append('changed')
+        assert second == after
+        assert copy.deepcopy(before) + delta == after
+
     def test_from_null_delta_json(self):
         t1 = None
         t2 = [1, 2, 3, 5]
