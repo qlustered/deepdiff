@@ -71,7 +71,10 @@ class TreeResult(ResultDict):
         if iterable_item_added is not None and iterable_item_removed is not None:
             added_paths = {i.path(): i for i in iterable_item_added}
             removed_paths = {i.path(): i for i in iterable_item_removed}
-            mutual_paths = set(added_paths) & set(removed_paths)
+            mutual_paths = {
+                path for path in set(added_paths) & set(removed_paths)
+                if not (added_paths[path].paired_by_key or removed_paths[path].paired_by_key)
+            }
 
             if mutual_paths and 'values_changed' not in self or self['values_changed'] is None:
                 self['values_changed'] = SetOrdered()
@@ -589,6 +592,11 @@ class DiffLevel:
 
         self.verbose_level = verbose_level
 
+        # True when this item was added or removed in a list whose items are paired by
+        # iterable_match_keys. Such an add and remove at the same index are different records,
+        # so they are not merged into values_changed.
+        self.paired_by_key = False
+
     def __repr__(self) -> str:
         if self.verbose_level:
             from deepdiff.summarize import summarize
@@ -736,7 +744,8 @@ class DiffLevel:
                 # To ensure we can properly replay items such as values_changed in items that may have moved, we
                 # need to make sure that all paths are reported relative to t2 if a level has reported a move.
                 # If we are reporting a move, the path is already correct and does not need to be swapped.
-                # Additional context of "moved" is only ever set if using iterable_compare_func and a move has taken place.
+                # Additional context of "moved" is only ever set if using iterable_compare_func or iterable_match_keys
+                # and a move has taken place.
                 level_use_t2 = not use_t2
             else:
                 level_use_t2 = use_t2
@@ -817,7 +826,7 @@ class DiffLevel:
 
     def copy(self) -> 'DiffLevel':
         """
-        Get a deep copy of this comparision line.
+        Get a deep copy of this comparison line.
         :return: The leaf ("downmost") object of the copy.
         """
         orig = self.all_up

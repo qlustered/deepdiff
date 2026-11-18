@@ -1,0 +1,84 @@
+name: PR sandbox monitor
+
+# Runs the PR's deepdiff/ and tests/ inside bubblewrap, under strace, with canary credentials
+# in a fake $HOME and a Python audit hook, and fails if the code reads credentials, tries the
+# network, spawns unexpected programs, writes outside its work dir, etc.
+# See scripts/pr_sandbox/README.md.
+#
+# The sandbox tooling, lockfile and pytest config come from the BASE commit. The PR's code
+# is checked out separately and only ever executed inside the sandbox.
+#
+# Caveat: on `pull_request`, GitHub runs this workflow file as the PR modified it, so a PR
+# could disable this check. The pr-risk-label workflow (tamper-proof) labels any PR that
+# touches .github/ or scripts/, so look for 'risk: ci' / 'risk: sandbox-tooling'.
+on:
+  pull_request:
+    branches: [master, dev]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-sandbox-monitor-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out sandbox tooling from the base commit (trusted)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: trusted
+          persist-credentials: false
+
+      - name: Check out the PR (untrusted; only executed inside the sandbox)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: untrusted
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+
+      - name: Install bubblewrap and strace
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq bubblewrap strace
+          # Ubuntu 24.04+ restricts unprivileged user namespaces via AppArmor; bwrap needs them.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+
+      - name: Run the PR's tests in the sandbox
+        run: |
+          tooling=trusted/scripts/pr_sandbox
+          if [ ! -x "$tooling/run-sandboxed.sh" ]; then
+            # Bootstrap only: the base commit predates this tooling (i.e. the PR that adds it).
+            # Fall back to the PR's own copy, which means this run's verdict can't be trusted.
+            msg="Base commit has no scripts/pr_sandbox; used the PR's own copy, so this verdict is NOT trustworthy."
+            echo "::warning::$msg"
+            echo "> **Warning:** $msg" >> "$GITHUB_STEP_SUMMARY"
+            tooling=untrusted/scripts/pr_sandbox
+          fi
+          "$tooling/run-sandboxed.sh" \
+            --monitor-only --python 3.15 --out "$RUNNER_TEMP/pr-sandbox" untrusted
+
+      - name: Publish report
+        if: always()
+        run: |
+          report="$RUNNER_TEMP/pr-sandbox/report"
+          if [ -f "$report/report.md" ]; then cat "$report/report.md" >> "$GITHUB_STEP_SUMMARY"; fi
+          gzip -f "$report/strace.log" 2>/dev/null || true
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pr-sandbox-report
+          path: |
+            ${{ runner.temp }}/pr-sandbox/report/
+            ${{ runner.temp }}/pr-sandbox/audit/
+          retention-days: 14
+          if-no-files-found: ignore

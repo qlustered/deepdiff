@@ -1,4 +1,4 @@
-# DeepDiff v 9.1.0
+# DeepDiff v 9.2.0
 
 ![Downloads](https://img.shields.io/pypi/dm/deepdiff.svg?style=flat)
 ![Python Versions](https://img.shields.io/pypi/pyversions/deepdiff.svg?style=flat)
@@ -19,27 +19,27 @@
 - [Extract](https://zepworks.com/deepdiff/current/extract.html): Extract an item from a nested Python object using its path.
 - [commandline](https://zepworks.com/deepdiff/current/commandline.html): Use DeepDiff from commandline.
 
-Tested on Python 3.10+ and PyPy3.
+Tested on Python 3.11+ and PyPy3.
 
-- **[Documentation](https://zepworks.com/deepdiff/9.1.0/)**
+- **[Documentation](https://zepworks.com/deepdiff/9.2.0/)**
 
 ## What is new?
 
 Please check the [ChangeLog](CHANGELOG.md) file for the detailed information.
 
-DeepDiff 9-1-0
-- Added multiprocessing support for DeepDiff: parallel distance computation and parallel subtree diffing with aggregated worker stats, deterministic ordering, and automatic fallback to serial when unsafe (e.g. `custom_operators`, `*_obj_callback`, `ignore_order_func`)
-- Added wildcard/glob pattern support for `exclude_paths` and `include_paths` thanks to @akshat62
-- Reimplemented internal cache for improved performance
-- Memoized `GlobPathMatcher` to remove exponential-time matching cliff
-- Comprehensive type-hint corrections across `deephash.py`, `helper.py`, `delta.py`, `diff.py`, `distance.py`, `path.py`, and `serialization.py` (also fixed real bugs: misplaced paren in `path._guess_type` call, and `len(other.indexes > 1)` → `len(other.indexes) > 1` in `diff._compare_in_order`)
-- Security: Delta dunder-attribute traversal in `check_elem()` now raises immediately instead of going through `_raise_or_log()`, with full-path preflight validation in `_get_elements_and_details()` so the `set_item_added` path cannot silently skip malicious dunder paths
-- Fixed nested NamedTuple set/frozenset Delta updates dropping the outer container
-- Fixed tuple Deltas using iterable opcodes silently doing nothing for insert/delete-only changes
-- Fixed Delta with both moved and added iterable items mutating the Delta's own internal diff data
-- Fixed crash during path sorting when removing multiple dictionary items with complex keys
-- Packaging: added missing files to sdist and removed obsolete `MANIFEST.in` thanks to @mgorny
-- Updated GitHub Actions workflows and dependencies
+DeepDiff 9-2-0
+- Added `iterable_match_keys` to match list items by key per path, e.g. `{"root['orders']": "order_id", "root['orders'][*]['lines']": ("sku", "warehouse")}`. Inserted, removed and reordered records are reported per record at real list indexes, and `Delta` round-trips (#664)
+- Support for Python 3.15
+- Dropping support for Python 3.10, which reached end-of-life in October 2026
+- Fixed `iterable_compare_func` dropping an added item whose content equals an item that was already matched, e.g. `[{"id": 1}]` vs `[{"id": 1}, {"id": 1}]` returned `{}` (#665)
+- Fixed missing type changes between equal-comparing items inside ordered iterables, e.g. `DeepDiff([2], [2.0])` now reports the `int` → `float` change like `DeepDiff(2, 2.0)` already does (#605) thanks to @Sanjays2402
+- Fixed `truncate_datetime` crashing on non-truncatable types: it now applies only to `datetime.datetime` and `datetime.time` objects, so `datetime.date`, `timedelta` and `np.datetime64` values are compared exactly instead of raising `AttributeError` thanks to @SAY-5 and @Sanjays2402
+- Fixed `number_to_string` producing an invalid string such as `1.0+-1.0j` for complex numbers with a negative imaginary part, which crashed e.g. `DeepHash(1-1j, significant_digits=3)` (#551) thanks to @koriyoshi2041 and @Sanjays2402
+- Fixed Delta JSON round-trip crashing with `TypeError` when orjson is not installed, for list diffs that use iterable opcodes thanks to @chuenchen309
+- Fixed `_dict_from_slots` dropping a parent-declared mangled `__slots__` attribute for a subclass instance (#506) thanks to @uttam12331
+- The `deep` command now exits with an actionable message (`pip install "deepdiff[cli]"`) instead of a `ModuleNotFoundError` traceback when the `cli` extra is not installed (#594) thanks to @uttam12331
+- Fixed typos in docstrings and comments thanks to @Labib-Bin-Salam
+- Updated dependencies, and switched release tooling from bump2version to bump-my-version
 
 ## Installation
 
@@ -57,7 +57,7 @@ If you want to improve the performance of DeepDiff with certain functionalities 
 
 Install optional packages:
 - [yaml](https://pypi.org/project/PyYAML/)
-- [tomli](https://pypi.org/project/tomli/) (python 3.10 and older) and [tomli-w](https://pypi.org/project/tomli-w/) for writing
+- [tomli-w](https://pypi.org/project/tomli-w/) for writing
 - [clevercsv](https://pypi.org/project/clevercsv/) for more robust CSV parsing
 - [orjson](https://pypi.org/project/orjson/) for speed and memory optimized parsing
 - [pydantic](https://pypi.org/project/pydantic/)

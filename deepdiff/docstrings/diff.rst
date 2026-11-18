@@ -19,6 +19,7 @@ DeepDiff
    exclude_paths
    ignore_order
    ignore_types_or_values
+   iterable_match_keys
    numbers
    optimizations
    other
