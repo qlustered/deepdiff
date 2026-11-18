@@ -44,7 +44,7 @@ cli = [
   "pyyaml~=6.0.3"
 ]
 dev = [
-  "bump2version~=1.0.1",
+  "bump-my-version~=1.8.1",
   "jsonpickle~=4.1.4",
   "ipdb~=0.13.13",
   "numpy~=2.5.4; python_version >= '3.12'",
