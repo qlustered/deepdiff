@@ -499,6 +499,17 @@ class Delta:
             self._do_values_or_type_changed(type_changes, is_type_change=True)
 
     def _do_post_process(self):
+        # Whole-array replacements (including scalar-shaped arrays) bypass
+        # iterable preprocessing, but still need their recorded dtype restored.
+        if self._numpy_paths:
+            for path, type_ in self._numpy_paths.items():
+                if path in self.diff.get('values_changed', {}) or path in self.diff.get('type_changes', {}):
+                    try:
+                        dtype = numpy_dtype_string_to_type(type_)
+                    except Exception as e:
+                        self._raise_or_log(NOT_VALID_NUMPY_TYPE.format(e))
+                        continue
+                    self.post_process_paths_to_convert[path] = {'old_type': list, 'new_type': dtype}
         if self.post_process_paths_to_convert:
             # Example: We had converted some object to be mutable and now we are converting them back to be immutable.
             # We don't need to check the change because it is not really a change that was part of the original diff.
