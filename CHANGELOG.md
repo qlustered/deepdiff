@@ -4,6 +4,7 @@
     - Added `iterable_match_keys` to match list items by key per path, e.g. `{"root['orders']": "order_id", "root['orders'][*]['lines']": ("sku", "warehouse")}`. Inserted, removed and reordered records are reported per record at real list indexes, and `Delta` round-trips (#664).
     - Fixed `iterable_compare_func` dropping an added item whose content equals an item that was already matched, e.g. `[{"id": 1}]` vs `[{"id": 1}, {"id": 1}]` returned `{}` (#665).
     - Fixed missing type changes between equal-comparing items inside ordered iterables, e.g. `DeepDiff([2], [2.0])` now reports the `int` → `float` change like `DeepDiff(2, 2.0)` and `DeepDiff({'a': 2}, {'a': 2.0})` already do (issue #605).
+    - Fixed `exclude_regex_paths` being ignored by the `threshold_to_diff_deeper` shortcut, so a dict whose differing keys are all regex-excluded is no longer reported as a whole `values_changed` (issue #487).
 
 - v9-1-0
     - Fixed `_dict_from_slots` dropping a parent-declared mangled `__slots__` attribute for a subclass instance, because the name was unmangled using the concrete instance type instead of the declaring class (#506)
