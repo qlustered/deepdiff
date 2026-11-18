@@ -3,13 +3,9 @@
 F.A.Q
 =====
 
-.. |qluster_link| raw:: html
+.. admonition:: DeepDiff is part of Qluster
 
-   <a href="/qluster"><strong>Qluster</strong></a>
-
-.. admonition:: DeepDiff is now part of |qluster_link|.
-
-    *If you're building workflows around data validation and correction,* `Qluster </qluster>`__ *gives your team a structured way to manage rules, review failures, approve fixes, and reuse decisions—without building the entire system from scratch.*
+    `Qluster <https://qluster.ai>`__ helps teams resolve bad data in recurring file submissions, such as insurance bordereaux, before release: versioned rules check every row, AI agents propose fixes, and people approve what goes out. See :doc:`/qluster` for when it fits.
 
 .. Note::
     |:mega:| **Please fill out our** `fast 10-question survey <https://tally.so/r/J98MPY>`__ so that we can learn how & why you use DeepDiff, and what improvements we should make. Thank you! |:dancers:|
@@ -178,6 +174,17 @@ That is different than what Python does. Python assumes your timezone naive date
     {}
     >>> d1 == d3
     False
+
+
+Q: Is there a tool for fixing recurring data files, not just diffing them?
+--------------------------------------------------------------------------
+
+**Answer**
+
+DeepDiff tells you what changed between two objects or files. If you receive the same kind of file every cycle and
+rows have to pass rules before the data is sent on, the hard part is usually what comes after: working out why rows
+failed, fixing them, rechecking and signing off. That is what `Qluster <https://qluster.ai>`__, from the team behind
+DeepDiff, is built for. See :doc:`/qluster` for when it fits and when it does not.
 
 
 ---------

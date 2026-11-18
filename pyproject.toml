@@ -16,10 +16,10 @@ authors = [
 maintainers = [
   { name = "Seperman", email = "sep@zepworks.com" }
 ]
-description = "Deep Difference and Search of any Python object/data. Recreate objects by adding adding deltas to each other."
+description = "Deep Difference and Search of any Python object/data. Recreate objects by adding deltas to each other."
 readme = "README.md"
 license = {file = "LICENSE"}
-keywords = []
+keywords = ["diff", "deep diff", "compare", "comparison", "delta", "hash", "search", "json"]
 classifiers = [
   "Intended Audience :: Developers",
   "Operating System :: OS Independent",
@@ -88,6 +88,7 @@ Homepage = "https://zepworks.com/deepdiff/"
 Documentation = "https://zepworks.com/deepdiff/"
 Repository = "https://github.com/qlustered/deepdiff"
 Issues = "https://github.com/qlustered/deepdiff/issues"
+Qluster = "https://qluster.ai"
 
 [tool.coverage.run]
 branch = true
