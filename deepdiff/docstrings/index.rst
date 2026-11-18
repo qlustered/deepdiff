@@ -40,25 +40,21 @@ The DeepDiff library includes the following modules:
 What Is New
 ***********
 
-DeepDiff 9-0-0
+DeepDiff 9-2-0
 --------------
 
-   - migration note:
-        - `to_dict()` and `to_json()` now accept a `verbose_level` parameter and always return a usable text-view dict. When the original view is `'tree'`, they default to `verbose_level=2` for full detail. The old `view_override` parameter is removed. To get the previous results, you will need to pass the explicit verbose_level to `to_json` and `to_dict` if you are using the tree view.
-   - Dropping support for Python 3.9
-   - Support for python 3.14
-   - Added support for callable ``group_by`` thanks to `echan5 <https://github.com/echan5>`__
-   - Added ``FlatDeltaDict`` TypedDict for ``to_flat_dicts`` return type
-   - Fixed colored view display when all list items are removed thanks to `yannrouillard <https://github.com/yannrouillard>`__
-   - Fixed ``hasattr()`` swallowing ``AttributeError`` in ``__slots__`` handling for objects with ``__getattr__`` thanks to `tpvasconcelos <https://github.com/tpvasconcelos>`__
-   - Fixed ``ignore_order=True`` missing int-vs-float type changes
-   - Fixed Delta producing phantom entries when items both move and change values with ``iterable_compare_func`` thanks to `devin13cox <https://github.com/devin13cox>`__
-   - Fixed ``_convert_oversized_ints`` failing on NamedTuples
-   - Fixed orjson ``TypeError`` for integers exceeding 64-bit range
-   - Fixed parameter bug in ``to_flat_dicts`` where ``include_action_in_path`` and ``report_type_changes`` were not being passed through
-   - Fixed ``ignore_keys`` issue in ``detailed__dict__`` thanks to `vitalis89 <https://github.com/vitalis89>`__
-   - Fixed logarithmic similarity type hint thanks to `ljames8 <https://github.com/ljames8>`__
-   - Added ``Fraction`` numeric support thanks to `akshat62 <https://github.com/akshat62>`__
+   - Added ``iterable_match_keys`` to match list items by key per path, e.g. ``{"root['orders']": "order_id", "root['orders'][*]['lines']": ("sku", "warehouse")}``. Inserted, removed and reordered records are reported per record at real list indexes, and ``Delta`` round-trips (#664)
+   - Support for Python 3.15
+   - Dropping support for Python 3.10, which reached end-of-life in October 2026
+   - Fixed ``iterable_compare_func`` dropping an added item whose content equals an item that was already matched, e.g. ``[{"id": 1}]`` vs ``[{"id": 1}, {"id": 1}]`` returned ``{}`` (#665)
+   - Fixed missing type changes between equal-comparing items inside ordered iterables, e.g. ``DeepDiff([2], [2.0])`` now reports the ``int`` → ``float`` change like ``DeepDiff(2, 2.0)`` already does (#605) thanks to `Sanjays2402 <https://github.com/Sanjays2402>`__
+   - Fixed ``truncate_datetime`` crashing on non-truncatable types: it now applies only to ``datetime.datetime`` and ``datetime.time`` objects, so ``datetime.date``, ``timedelta`` and ``np.datetime64`` values are compared exactly instead of raising ``AttributeError`` thanks to `SAY-5 <https://github.com/SAY-5>`__ and `Sanjays2402 <https://github.com/Sanjays2402>`__
+   - Fixed ``number_to_string`` producing an invalid string such as ``1.0+-1.0j`` for complex numbers with a negative imaginary part, which crashed e.g. ``DeepHash(1-1j, significant_digits=3)`` (#551) thanks to `koriyoshi2041 <https://github.com/koriyoshi2041>`__ and `Sanjays2402 <https://github.com/Sanjays2402>`__
+   - Fixed Delta JSON round-trip crashing with ``TypeError`` when orjson is not installed, for list diffs that use iterable opcodes thanks to `chuenchen309 <https://github.com/chuenchen309>`__
+   - Fixed ``_dict_from_slots`` dropping a parent-declared mangled ``__slots__`` attribute for a subclass instance (#506) thanks to `uttam12331 <https://github.com/uttam12331>`__
+   - The ``deep`` command now exits with an actionable message (``pip install "deepdiff[cli]"``) instead of a ``ModuleNotFoundError`` traceback when the ``cli`` extra is not installed (#594) thanks to `uttam12331 <https://github.com/uttam12331>`__
+   - Fixed typos in docstrings and comments thanks to `Labib-Bin-Salam <https://github.com/Labib-Bin-Salam>`__
+   - Updated dependencies, and switched release tooling from bump2version to bump-my-version
 
 *********
 Tutorials

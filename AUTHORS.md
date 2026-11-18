@@ -89,3 +89,10 @@ Authors in order of the timeline of their contributions:
 - [akshat62](https://github.com/akshat62) for adding wildcard/glob pattern support for `exclude_paths` and `include_paths`.
 - [mgorny](https://github.com/mgorny) for adding missing files to sdist and removing obsolete `MANIFEST.in`.
 - [Sanjays2402](https://github.com/Sanjays2402) for fixing missing type changes between equal-comparing list items (e.g. `[2]` vs `[2.0]`).
+- [SAY-5](https://github.com/SAY-5) for skipping time truncation for `date` objects in `truncate_datetime`.
+- [koriyoshi2041](https://github.com/koriyoshi2041) for handling negative imaginary parts in `number_to_string`.
+- [Labib-Bin-Salam](https://github.com/Labib-Bin-Salam) for fixing typos in docstrings and comments.
+- [uttam12331](https://github.com/uttam12331) for fixing mangled `__slots__` attributes lost for subclass instances.
+- [uttam12331](https://github.com/uttam12331) for giving an actionable error when `deep` runs without the `cli` extra.
+- [chuenchen309](https://github.com/chuenchen309) for fixing Delta JSON round-trip crash when orjson is not installed.
+- [Sanjays2402](https://github.com/Sanjays2402) for fixing `truncate_datetime` for `timedelta` and `np.datetime64`, and adding negative-imaginary `number_to_string` tests.
