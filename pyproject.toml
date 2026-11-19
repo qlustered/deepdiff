@@ -4,7 +4,7 @@ build-backend = "flit_core.buildapi"
 
 [project]
 name = "deepdiff"
-version = "9.1.0"
+version = "9.2.1"
 dependencies = [
   "cachebox>=6.1.2,<7",
   "orderly-set>=5.5.0,<6",
@@ -16,10 +16,10 @@ authors = [
 maintainers = [
   { name = "Seperman", email = "sep@zepworks.com" }
 ]
-description = "Deep Difference and Search of any Python object/data. Recreate objects by adding adding deltas to each other."
+description = "Deep Difference and Search of any Python object/data. Recreate objects by adding deltas to each other."
 readme = "README.md"
 license = {file = "LICENSE"}
-keywords = []
+keywords = ["diff", "deep diff", "compare", "comparison", "delta", "hash", "search", "json"]
 classifiers = [
   "Intended Audience :: Developers",
   "Operating System :: OS Independent",
@@ -44,7 +44,7 @@ cli = [
   "pyyaml~=6.0.3"
 ]
 dev = [
-  "bump2version~=1.0.1",
+  "bump-my-version~=1.8.1",
   "jsonpickle~=4.1.4",
   "ipdb~=0.13.13",
   "numpy~=2.5.4; python_version >= '3.12'",
@@ -88,6 +88,7 @@ Homepage = "https://zepworks.com/deepdiff/"
 Documentation = "https://zepworks.com/deepdiff/"
 Repository = "https://github.com/qlustered/deepdiff"
 Issues = "https://github.com/qlustered/deepdiff/issues"
+Qluster = "https://qluster.ai"
 
 [tool.coverage.run]
 branch = true

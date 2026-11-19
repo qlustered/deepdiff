@@ -59,7 +59,7 @@ pr-review: _require-pr
 	fi; \
 	echo "==> reviewing PR $(PR) with report $$report"; \
 	prompt=$$(sed -e "s|{PR}|$(PR)|g" -e "s|{REPORT}|$$report|g" $(SANDBOX)/review-prompt.md); \
-	zsh -ic '$(CLAUDE_CMD) --permission-mode dontAsk --settings "$$1" --add-dir "$$2" "$$3"' _ \
+	zsh -ic '$(CLAUDE_CMD) --permission-mode dontAsk --settings "$$1" --add-dir "$$2" -- "$$3"' _ \
 		"$(CURDIR)/$(SANDBOX)/review-settings.json" "$$(dirname "$$report")" "$$prompt"
 
 pr-clean:

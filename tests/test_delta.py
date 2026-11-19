@@ -2820,6 +2820,26 @@ class TestDeltaCompareFunc:
         assert l2 == l1 + delta5
         assert l1 == l2 - delta5
 
+    def test_delta_iterable_opcodes_json_roundtrip_builtin_json(self):
+        # A list diff that goes through difflib opcodes (reorder / duplicates)
+        # serializes each Opcode NamedTuple. orjson emits it as a mapping, but
+        # the stdlib json fallback (used when orjson is not installed) emits it
+        # as a positional array; the deserializer must accept both. Forcing the
+        # builtin json path exercises the array shape even where orjson is
+        # installed, so a plain-install regression cannot hide behind orjson.
+        t1 = ['a', 'b', 'c', 'd', 'b', 'e']
+        t2 = ['b', 'c', 'x', 'b', 'e', 'f']
+        diff = DeepDiff(t1, t2)
+
+        def builtin_json_dumps(item):
+            return json_dumps(item, force_use_builtin_json=True)
+
+        dump = Delta(diff, bidirectional=True, serializer=builtin_json_dumps).dumps()
+        delta = Delta(dump, bidirectional=True, deserializer=json_loads)
+
+        assert t1 + delta == t2
+        assert t2 - delta == t1
+
     def test_delta_flat_rows(self):
         t1 = {"key1": "value1"}
         t2 = {"field2": {"key2": "value2"}}

@@ -2,12 +2,22 @@
 
 - Unreleased
     - Fixed `DeepSearch(exclude_types=...)` applying type exclusions to the search term instead of the current object. Excluded root and nested objects are now skipped, while excluding the search term's type no longer suppresses matches on other object types (#629).
-    - Added `iterable_match_keys` to match list items by key per path, e.g. `{"root['orders']": "order_id", "root['orders'][*]['lines']": ("sku", "warehouse")}`. Inserted, removed and reordered records are reported per record at real list indexes, and `Delta` round-trips (#664).
-    - Fixed `iterable_compare_func` dropping an added item whose content equals an item that was already matched, e.g. `[{"id": 1}]` vs `[{"id": 1}, {"id": 1}]` returned `{}` (#665).
-    - Fixed missing type changes between equal-comparing items inside ordered iterables, e.g. `DeepDiff([2], [2.0])` now reports the `int` → `float` change like `DeepDiff(2, 2.0)` and `DeepDiff({'a': 2}, {'a': 2.0})` already do (issue #605).
+
+- v9-2-0
+    - Added `iterable_match_keys` to match list items by key per path, e.g. `{"root['orders']": "order_id", "root['orders'][*]['lines']": ("sku", "warehouse")}`. Inserted, removed and reordered records are reported per record at real list indexes, and `Delta` round-trips (#664)
+    - Support for Python 3.15
+    - Dropping support for Python 3.10, which reached end-of-life in October 2026
+    - Fixed `iterable_compare_func` dropping an added item whose content equals an item that was already matched, e.g. `[{"id": 1}]` vs `[{"id": 1}, {"id": 1}]` returned `{}` (#665)
+    - Fixed missing type changes between equal-comparing items inside ordered iterables, e.g. `DeepDiff([2], [2.0])` now reports the `int` → `float` change like `DeepDiff(2, 2.0)` already does (#605) thanks to [Sanjays2402](https://github.com/Sanjays2402)
+    - Fixed `truncate_datetime` crashing on non-truncatable types: it now applies only to `datetime.datetime` and `datetime.time` objects, so `datetime.date`, `timedelta` and `np.datetime64` values are compared exactly instead of raising `AttributeError` thanks to [SAY-5](https://github.com/SAY-5) and [Sanjays2402](https://github.com/Sanjays2402)
+    - Fixed `number_to_string` producing an invalid string such as `1.0+-1.0j` for complex numbers with a negative imaginary part, which crashed e.g. `DeepHash(1-1j, significant_digits=3)` (#551) thanks to [koriyoshi2041](https://github.com/koriyoshi2041) and [Sanjays2402](https://github.com/Sanjays2402)
+    - Fixed Delta JSON round-trip crashing with `TypeError` when orjson is not installed, for list diffs that use iterable opcodes thanks to [chuenchen309](https://github.com/chuenchen309)
+    - Fixed `_dict_from_slots` dropping a parent-declared mangled `__slots__` attribute for a subclass instance (#506) thanks to [uttam12331](https://github.com/uttam12331)
+    - The `deep` command now exits with an actionable message (`pip install "deepdiff[cli]"`) instead of a `ModuleNotFoundError` traceback when the `cli` extra is not installed (#594) thanks to [uttam12331](https://github.com/uttam12331)
+    - Fixed typos in docstrings and comments thanks to [Labib-Bin-Salam](https://github.com/Labib-Bin-Salam)
+    - Updated dependencies, and switched release tooling from bump2version to bump-my-version
 
 - v9-1-0
-    - Fixed `_dict_from_slots` dropping a parent-declared mangled `__slots__` attribute for a subclass instance, because the name was unmangled using the concrete instance type instead of the declaring class (#506)
     - Added multiprocessing support for DeepDiff: parallel distance computation and parallel subtree diffing with aggregated worker stats, deterministic ordering, and automatic fallback to serial when unsafe (e.g. `custom_operators`, `*_obj_callback`, `ignore_order_func`)
     - Added wildcard/glob pattern support for `exclude_paths` and `include_paths` thanks to [akshat62](https://github.com/akshat62)
     - Reimplemented internal cache for improved performance

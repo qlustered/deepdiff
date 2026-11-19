@@ -64,9 +64,9 @@ author = 'Sep Dehpour'
 # built documents.
 #
 # The short X.Y version.
-version = '9.1.0'
+version = '9.2.1'
 # The full version, including alpha/beta/rc tags.
-release = '9.1.0'
+release = '9.2.1'
 
 load_dotenv(override=True)
 DOC_VERSION = os.environ.get('DOC_VERSION', version)
@@ -241,7 +241,7 @@ html_css_files = ['custom.css']
 # Add any extra paths that contain custom files (such as robots.txt or
 # .htaccess) here, relative to this directory. These files are copied
 # directly to the root of the documentation.
-#html_extra_path = []
+html_extra_path = ["_extra"]
 
 # If not '', a 'Last updated on:' timestamp is inserted at every page bottom,
 # using the given strftime format.
