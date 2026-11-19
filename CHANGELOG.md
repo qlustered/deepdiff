@@ -1,5 +1,8 @@
 # DeepDiff Change log
 
+- Unreleased
+    - Fixed `DeepSearch(exclude_types=...)` applying type exclusions to the search term instead of the current object. Excluded root and nested objects are now skipped, while excluding the search term's type no longer suppresses matches on other object types (#629).
+
 - v9-2-0
     - Added `iterable_match_keys` to match list items by key per path, e.g. `{"root['orders']": "order_id", "root['orders'][*]['lines']": ("sku", "warehouse")}`. Inserted, removed and reordered records are reported per record at real list indexes, and `Delta` round-trips (#664)
     - Support for Python 3.15
