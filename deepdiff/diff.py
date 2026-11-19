@@ -810,11 +810,11 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
             self._report_result(item_removed_key, change_level, local_tree=local_tree)
 
         for key in t_keys_intersect:  # key present in both dicts - need to compare values
-            if self._count_diff() is StopIteration:
-                return  # pragma: no cover. This is already covered for addition.
-
             key1 = t1_clean_to_keys[key] if t1_clean_to_keys else key
             key2 = t2_clean_to_keys[key] if t2_clean_to_keys else key
+            if not self._is_ignored_nan_inequality(t1[key1], t2[key2]) and self._count_diff() is StopIteration:
+                return  # pragma: no cover. This is already covered for addition.
+
             item_id = id(t1[key1])
             if parents_ids and item_id in parents_ids:
                 continue
@@ -1079,7 +1079,7 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
             t2_from_index=t2_from_index, t2_to_index=t2_to_index,
             match_key_spec=match_key_spec,
         ):
-            if self._count_diff() is StopIteration:
+            if not self._is_ignored_nan_inequality(x, y) and self._count_diff() is StopIteration:
                 return  # pragma: no cover. This is already covered for addition.
 
             reference_param1 = i
@@ -2122,6 +2122,15 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
         level.report_type = 'type_changes'
         self._report_result('type_changes', level, local_tree=local_tree)
 
+    def _is_ignored_nan_inequality(self, t1, t2):
+        """Whether comparing t1 and t2 is a NaN-vs-NaN comparison that
+        ignore_nan_inequality forgives, i.e. the pair is not a diff."""
+        return bool(
+            self.ignore_nan_inequality
+            and isinstance(t1, (float, np_floating))
+            and str(t1) == str(t2) == 'nan'
+        )
+
     def _count_diff(self):
         if (self.max_diffs is not None and self._stats[DIFF_COUNT] > self.max_diffs):
             if not self._stats[MAX_DIFF_LIMIT_REACHED]:
@@ -2186,8 +2195,13 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
         parents_ids: the ids of all the parent objects in the tree from the current node.
         _original_type: If the objects had an original type that was different than what currently exists in the level.t1 and t2
         """
-        if self._count_diff() is StopIteration:
-            return
+        # Pairs forgiven by ignore_nan_inequality are not diffs, so they must
+        # not consume the max_diffs budget: otherwise enough NaN pairs make
+        # the traversal stop (with the max-diffs warning) before the real
+        # diffs are reached, and those diffs are silently dropped.
+        if not self._is_ignored_nan_inequality(level.t1, level.t2):
+            if self._count_diff() is StopIteration:
+                return
 
         if self._use_custom_operator(level):
             return
@@ -2218,7 +2232,7 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
                 self._report_result('values_changed', level, local_tree=local_tree)
                 return
 
-        if self.ignore_nan_inequality and isinstance(level.t1, (float, np_floating)) and str(level.t1) == str(level.t2) == 'nan':
+        if self._is_ignored_nan_inequality(level.t1, level.t2):
             return
 
         if isinstance(level.t1, booleans):

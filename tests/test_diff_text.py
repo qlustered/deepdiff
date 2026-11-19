@@ -1938,6 +1938,28 @@ class TestDeepDiffText:
     def test_ignore_nan_inequality(self, t1, t2, params, expected_result):
         assert expected_result == list(DeepDiff(t1, t2, **params).keys())
 
+    @pytest.mark.skipif(pypy3, reason="some versions of pypy3 have nan==nan")
+    def test_ignore_nan_inequality_does_not_consume_max_diffs(self):
+        # NaN pairs forgiven by ignore_nan_inequality are not diffs, so they
+        # must not eat into the max_diffs budget: the real diff after them
+        # still has to be found, with no max-diffs warning.
+        nan = float('nan')
+        t1 = [nan, nan, nan, nan, 1]
+        t2 = [nan, nan, nan, nan, 2]
+        expected = {'values_changed': {'root[4]': {'new_value': 2, 'old_value': 1}}}
+        assert expected == DeepDiff(t1, t2, ignore_nan_inequality=True, max_diffs=2)
+
+        t1 = {'a': nan, 'b': nan, 'c': nan, 'd': 1}
+        t2 = {'a': nan, 'b': nan, 'c': nan, 'd': 2}
+        expected = {'values_changed': {"root['d']": {'new_value': 2, 'old_value': 1}}}
+        assert expected == DeepDiff(t1, t2, ignore_nan_inequality=True, max_diffs=2)
+
+    def test_max_diffs_still_applies_to_real_diffs(self):
+        # Sanity check the other direction: real diffs keep counting, so the
+        # traversal still stops early once the budget is exceeded.
+        ddiff = DeepDiff([1, 2, 3, 4], [5, 6, 7, 8], max_diffs=2)
+        assert {'values_changed': {'root[0]': {'new_value': 5, 'old_value': 1}}} == ddiff
+
     @pytest.mark.parametrize('ignore_order, ignore_private_variables, expected', [
         (True, True, {}),
         (False, True, {}),

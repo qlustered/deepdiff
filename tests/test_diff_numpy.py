@@ -174,3 +174,18 @@ class TestNumpy:
     def test_numpy(self, test_name, t1, t2, deepdiff_kwargs, expected_result):
         diff = DeepDiff(t1, t2, **deepdiff_kwargs)
         assert expected_result == diff, f"test_numpy {test_name} failed."
+
+
+def test_numpy_ignore_nan_inequality_does_not_consume_max_diffs():
+    # With ignore_nan_inequality=True, NaN pairs are not diffs and must not
+    # consume the max_diffs budget; otherwise the traversal stops (with the
+    # max-diffs warning) before reaching the real diff at the end.
+    t1 = np.array([np.nan, np.nan, np.nan, np.nan, 1])
+    t2 = np.array([np.nan, np.nan, np.nan, np.nan, 2])
+    diff = DeepDiff(t1, t2, ignore_nan_inequality=True, max_diffs=2)
+    expected = {
+        'values_changed': {
+            'root[4]': {'new_value': np.float64(2.0), 'old_value': np.float64(1.0)}
+        }
+    }
+    assert expected == diff
