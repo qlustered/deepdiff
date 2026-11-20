@@ -460,6 +460,18 @@ class DeepHash(Base):
         else:
             self.hashes[UNPROCESSED_KEY].append(obj)  # type: ignore
             return (unprocessed, 0)
+        if not d and hasattr(obj, "__slots__"):
+            # The object declares __slots__ but none of them could be read,
+            # so the attribute representation is vacuous and every such
+            # object would hash to the same constant. For example bson
+            # ObjectId declares '__id' without populating it, so all
+            # ObjectIds hashed identically. If the object is hashable, fall
+            # back to the built-in hash instead; otherwise keep the empty
+            # representation. See #560.
+            try:
+                return ("objhash:{}".format(hash(obj)), 1)
+            except TypeError:
+                pass
         obj = d
 
         result, counts = self._prep_dict(obj, parent=parent, parents_ids=parents_ids,
