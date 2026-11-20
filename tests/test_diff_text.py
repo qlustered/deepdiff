@@ -1573,6 +1573,63 @@ class TestDeepDiffText:
         ddiff = DeepDiff(t1, t2, exclude_types={logging.Logger})
         assert {} == ddiff
 
+    def test_dict_subclass_whose_iter_yields_values(self):
+        """A dict subclass whose __iter__ yields values instead of keys
+        (like google.cloud.spanner_v1.data_types.JsonObject holding a JSON
+        array) must still diff by keys. See #569."""
+
+        class ArrayDict(dict):
+            def __init__(self, values):
+                super().__init__()
+                self._values = list(values)
+
+            def keys(self):
+                return dict(enumerate(self._values)).keys()
+
+            def __getitem__(self, key):
+                return self._values[key]
+
+            def __iter__(self):
+                return iter(self._values)
+
+            def __len__(self):
+                return len(self._values)
+
+        t1 = ArrayDict([])
+        t2 = ArrayDict([{"size": "L", "color": "red"}])
+        assert DeepDiff(t1, t2) == {'dictionary_item_added': ['root[0]']}
+        assert DeepDiff(t2, t1) == {'dictionary_item_removed': ['root[0]']}
+        assert DeepDiff(ArrayDict([1]), ArrayDict([2])) == {
+            'values_changed': {'root[0]': {'new_value': 2, 'old_value': 1}}}
+        assert DeepDiff(ArrayDict([1]), ArrayDict([1])) == {}
+        nested = DeepDiff({"j": ArrayDict([])}, {"j": ArrayDict([1, 2])})
+        assert set(nested['values_changed']) == {"root['j']"}
+        assert nested['values_changed']["root['j']"]['new_value']._values == [1, 2]
+        assert nested['values_changed']["root['j']"]['old_value']._values == []
+
+    def test_dict_subclass_with_no_keys_but_hidden_state(self):
+        """A dict subclass exposing no keys but unequal content (like a
+        JsonObject holding a scalar value) is reported as changed instead of
+        silently returning {}. See #569."""
+
+        class ScalarDict(dict):
+            def __init__(self, value):
+                super().__init__()
+                self._value = value
+
+            def __eq__(self, other):
+                return isinstance(other, ScalarDict) and self._value == other._value
+
+            def __ne__(self, other):
+                return not self.__eq__(other)
+
+        diff = DeepDiff(ScalarDict(5), ScalarDict(6))
+        assert set(diff['values_changed']) == {'root'}
+        assert diff['values_changed']['root']['new_value'] == ScalarDict(6)
+        assert diff['values_changed']['root']['old_value'] == ScalarDict(5)
+        assert DeepDiff(ScalarDict(5), ScalarDict(5)) == {}
+        assert DeepDiff({}, {}) == {}
+
     def test_skip_path1(self):
         t1 = {
             "for life": "vegan",
