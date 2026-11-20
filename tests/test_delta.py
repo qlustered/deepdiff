@@ -268,6 +268,24 @@ class TestBasicsOfDelta:
         assert expected_msg == str(excinfo.value)
         mock_logger.assert_called_once_with(expected_msg)
 
+    def test_bidirectional_delta_failed_reverse_keeps_direction(self):
+        before = {"counter": 1}
+        after = {"counter": 2}
+        delta = Delta(
+            DeepDiff(before, after),
+            bidirectional=True,
+            raise_errors=True,
+            log_errors=False,
+        )
+        assert before + delta == after
+
+        with pytest.raises(DeltaError):
+            {"counter": 9} - delta
+
+        # The failed reverse application must not leave the delta reversed.
+        assert before + delta == after
+        assert after - delta == before
+
     def test_list_difference3_delta(self):
         t1 = {1: 1, 2: 2, 3: 3, 4: {"a": "hello", "b": [1, 2, 5]}}
         t2 = {1: 1, 2: 2, 3: 3, 4: {"a": "hello", "b": [1, 3, 2, 5]}}
