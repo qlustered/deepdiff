@@ -395,7 +395,7 @@ class TestDeepDiffText:
         t1 = {'''a'"a''': 1}
         t2 = {'''a'"a''': 2}
         diff = DeepDiff(t1, t2)
-        expected = {'values_changed': {'root["a\'"a"]': {'new_value': 2, 'old_value': 1}}}
+        expected = {'values_changed': {"root[u'a\\\'\"a']": {'new_value': 2, 'old_value': 1}}}
         assert expected == diff
 
     def test_bytes(self):
