@@ -331,6 +331,50 @@ class TestDeepHash:
             }
         }
 
+    def test_hashable_object_with_unreadable_slots(self):
+        """Objects that declare __slots__ but never populate them (e.g. bson
+        ObjectId, which declares '__id' without exposing it) must not all
+        hash to the same constant. When such an object is hashable, its
+        built-in hash is used instead. See #560."""
+        class OpaqueSlots:
+            __slots__ = ('x',)
+
+        a = OpaqueSlots()
+        b = OpaqueSlots()
+        # Distinct opaque objects hash differently.
+        assert DeepHash(a)[a] != DeepHash(b)[b]
+        # The same object hashes consistently within a run.
+        assert DeepHash(a)[a] == DeepHash(a)[a]
+
+    def test_hashable_slots_object_hashes_by_value(self):
+        """A hashable slotted object with unreadable slots hashes by value,
+        so equal objects share a hash and different ones do not. See #560."""
+        class ValuedOpaque:
+            __slots__ = ('x',)
+            _values = {}
+
+            def __init__(self, value):
+                ValuedOpaque._values[id(self)] = value
+
+            def __hash__(self):
+                return hash(ValuedOpaque._values[id(self)])
+
+            def __eq__(self, other):
+                if not isinstance(other, ValuedOpaque):
+                    return False
+                return ValuedOpaque._values[id(self)] == ValuedOpaque._values[id(other)]
+
+        a = ValuedOpaque(1)
+        b = ValuedOpaque(1)
+        c = ValuedOpaque(2)
+        assert DeepHash(a)[a] == DeepHash(b)[b]
+        assert DeepHash(a)[a] != DeepHash(c)[c]
+        diff = DeepDiff({a}, {c}, ignore_order=True)
+        assert set(diff) == {'set_item_added', 'set_item_removed'}
+        assert len(diff['set_item_added']) == 1
+        assert len(diff['set_item_removed']) == 1
+        assert DeepDiff({a}, {b}, ignore_order=True) == {}
+
 class TestDeepHashPrep:
     """DeepHashPrep Tests covering object serialization."""
 
