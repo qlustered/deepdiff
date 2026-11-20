@@ -748,12 +748,27 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
             item_removed_key = "dictionary_item_removed"
             rel_class = DictRelationship
 
+        # Iterate .keys() rather than the dict itself: some dict subclasses
+        # (e.g. google.cloud.spanner JsonObject holding a JSON array) override
+        # __iter__ to yield values instead of keys, which made the key
+        # collection below crash on unhashable values. For well-behaved dicts
+        # iter(d) and iter(d.keys()) are identical.
+        # Dict subclasses can hold state that is not exposed as keys at all
+        # (e.g. a JsonObject holding a scalar value). When neither side
+        # exposes any raw key yet the objects are not equal, there is nothing
+        # to descend into, so report the whole value as changed instead of
+        # silently returning {}. Raw keys (before any private-key filtering)
+        # are used so ignored private keys alone never trigger this.
+        if not t1.keys() and not t2.keys() and t1 != t2:
+            self._report_result('values_changed', level, local_tree=local_tree)
+            return
+
         if self.ignore_private_variables:
-            t1_keys = SetOrdered([key for key in t1 if not(isinstance(key, str) and key.startswith('__')) and not self._skip_this_key(level, key)])
-            t2_keys = SetOrdered([key for key in t2 if not(isinstance(key, str) and key.startswith('__')) and not self._skip_this_key(level, key)])
+            t1_keys = SetOrdered([key for key in t1.keys() if not(isinstance(key, str) and key.startswith('__')) and not self._skip_this_key(level, key)])
+            t2_keys = SetOrdered([key for key in t2.keys() if not(isinstance(key, str) and key.startswith('__')) and not self._skip_this_key(level, key)])
         else:
-            t1_keys = SetOrdered([key for key in t1 if not self._skip_this_key(level, key)])
-            t2_keys = SetOrdered([key for key in t2 if not self._skip_this_key(level, key)])
+            t1_keys = SetOrdered([key for key in t1.keys() if not self._skip_this_key(level, key)])
+            t2_keys = SetOrdered([key for key in t2.keys() if not self._skip_this_key(level, key)])
         if self.ignore_string_type_changes or self.ignore_numeric_type_changes or self.ignore_string_case:
             t1_clean_to_keys = self._get_clean_to_keys_mapping(keys=t1_keys, level=level)
             t2_clean_to_keys = self._get_clean_to_keys_mapping(keys=t2_keys, level=level)
