@@ -2189,13 +2189,20 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
         if self._count_diff() is StopIteration:
             return
 
+        # When custom operators are set, check exclusions first so that
+        # operators never run on excluded paths (see #633). Without custom
+        # operators, the check below keeps the original order.
+        skip_this = self._skip_this(level) if self.custom_operators else None
+        if skip_this:
+            return
+
         if self._use_custom_operator(level):
             return
 
         if level.t1 is level.t2:
             return
 
-        if self._skip_this(level):
+        if skip_this is None and self._skip_this(level):
             return
 
         report_type_change = True

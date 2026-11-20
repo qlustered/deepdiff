@@ -426,3 +426,36 @@ class TestOperators:
         diff3 = DeepDiff(deepcopy(d1), deepcopy(d2), ignore_order=True, custom_operators=[RemoveGUIDsOperatorIgnoreOrderReady(types=[str])])
         assert not diff3, "We shouldn't have a diff because we have normalized the string values to be all the same vlues."
 
+    def test_custom_operator_not_applied_to_excluded_path(self):
+        # https://github.com/qlustered/deepdiff/issues/633
+        # Custom operators should not run on paths excluded via exclude_paths.
+
+        class CustomClass:
+            def __init__(self, d: dict, lst: list):
+                self.dict = d
+                self.dict['list'] = lst
+
+        visited = []
+
+        class ListMatchOperator(BaseOperator):
+            def give_up_diffing(self, level, diff_instance):
+                visited.append(level.path())
+                if set(level.t1.dict['list']) == set(level.t2.dict['list']):
+                    return True
+
+        custom1 = CustomClass(d=dict(a=1, b=2), lst=[1, 2, 3])
+        custom2 = CustomClass(d=dict(c=3, d=4), lst=[1, 2, 3, 2])
+        custom3 = CustomClass(d=dict(a=1, b=2), lst=[1, 2, 3, 4])
+
+        t1 = {"a": custom1, "b": custom2}
+        t2 = {"a": custom1, "b": custom3}
+
+        result = DeepDiff(
+            t1,
+            t2,
+            custom_operators=[ListMatchOperator(types=[CustomClass])],
+            exclude_paths=["root['b']"],
+        )
+        assert result == {}
+        assert visited == ["root['a']"]
+
