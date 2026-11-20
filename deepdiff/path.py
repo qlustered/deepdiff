@@ -72,6 +72,7 @@ def _add_to_elements(elements, elem, inside):
 
 
 DEFAULT_FIRST_ELEMENT = ('root', GETATTR)
+_ESCAPED_STR_RE = re.compile(r"""u(?:'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*")(?=\])""")
 
 
 @lru_cache(maxsize=1024 * 128)
@@ -96,7 +97,22 @@ def _path_to_elements(path, root_element=DEFAULT_FIRST_ELEMENT):
     brackets = []
     inside_quotes = False
     quote_used = ''
-    for char in path:
+    literal_end = 0
+    for index, char in enumerate(path):
+        if index < literal_end:
+            continue
+        if char == 'u' and not inside_quotes and inside == '[' and not elem:
+            match = _ESCAPED_STR_RE.match(path, index)
+            if match:
+                try:
+                    value = literal_eval(match.group())
+                except (ValueError, SyntaxError):
+                    pass
+                else:
+                    elements.append((value, GET))
+                    literal_end = match.end()
+                    prev_char = None
+                    continue
         if prev_char == '𝆺𝅥𝅯':
             elem += char
         elif char in {'"', "'"}:
@@ -313,13 +329,10 @@ def parse_path(path, root_element=DEFAULT_FIRST_ELEMENT, include_actions=False):
 def stringify_element(param, quote_str=None):
     has_quote = "'" in param
     has_double_quote = '"' in param
-    if has_quote and has_double_quote and not quote_str:
-        new_param = []
-        for char in param:
-            if char in {'"', "'"}:
-                new_param.append('𝆺𝅥𝅯')
-            new_param.append(char)
-        result = '"' + ''.join(new_param) + '"'
+    if has_quote and has_double_quote:
+        # Mark escaped literals explicitly so legacy raw-backslash paths retain
+        # their meaning, including keys ending in a backslash before a new segment.
+        result = 'u' + str.__repr__(param)
     elif has_quote:
         result = f'"{param}"'
     elif has_double_quote:
