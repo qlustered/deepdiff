@@ -121,6 +121,27 @@ class TestDeepDiffTree:
         assert change.path(force='yes') == 'root(unrepresentable)'
         assert change.path(force='fake') == 'root[2]'
 
+    def test_unrepresentable_dict_key_path(self):
+        class Id:
+            def __repr__(self):
+                return '<id>'
+
+            def __hash__(self):
+                return 1
+
+            def __eq__(self, other):
+                return isinstance(other, Id)
+
+        key = Id()
+        t1 = {key: 10}
+        t2 = {key: 20}
+        ddiff = DeepDiff(t1, t2, view='tree')
+        (change, ) = ddiff['values_changed']
+
+        # repr does not round-trip, so there is no parsable path
+        assert change.path() is None
+        assert change.path(force='yes') == 'root[(unrepresentable)]'
+
     def test_report_type_in_iterable(self):
         a = {"temp": ["a"]}
         b = {"temp": ["b"]}

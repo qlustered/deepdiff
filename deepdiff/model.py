@@ -956,6 +956,9 @@ class ChildRelationship:
             else:
                 result = candidate if resurrected == param else None
 
+        if result is None and force == 'yes':
+            result = '(unrepresentable)'
+
         if result:
             result = ':' if self.param_repr_format is None else self.param_repr_format.format(result)
 
