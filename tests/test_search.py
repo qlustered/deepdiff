@@ -2,6 +2,7 @@
 import pytest
 import ipaddress
 import logging
+import re
 from typing import Union
 from deepdiff import DeepSearch, grep
 from datetime import datetime
@@ -368,6 +369,49 @@ class TestDeepSearch:
         item = "some.*"
         result = {"matched_values": {"root"}}
         assert DeepSearch(obj, item, verbose_level=1, use_regexp=True) == result
+
+    @pytest.mark.parametrize('pattern, values, indexes', [
+        (r'\S+', ['word', '   '], [0]),
+        (r'\W+', ['word', '---'], [1]),
+        (r'\D+', ['123', 'letters'], [1]),
+        (r'\N{LATIN CAPITAL LETTER A}', ['a', 'A', 'b'], [0, 1]),
+        (r'\U0001F680', ['rocket', '\U0001F680'], [1]),
+        (r'(?-i:ABC)', ['ABC', 'abc'], [0]),
+        (r'(?-i:ABC)def', ['ABCdef', 'ABCDEF', 'abcdef'], [0, 1]),
+    ])
+    def test_case_insensitive_regex_preserves_syntax(self, pattern, values, indexes):
+        expected = {'matched_values': {f'root[{index}]': values[index] for index in indexes}}
+        assert DeepSearch(values, pattern, use_regexp=True, verbose_level=2) == expected
+
+    @pytest.mark.parametrize('case_sensitive, indexes', [(False, [0, 1]), (True, [0])])
+    def test_regex_case_sensitivity(self, case_sensitive, indexes):
+        values = ['ABC', 'abc', 'other']
+        expected = {'matched_values': {f'root[{index}]': values[index] for index in indexes}}
+        assert DeepSearch(values, 'ABC', use_regexp=True, case_sensitive=case_sensitive, verbose_level=2) == expected
+
+    @pytest.mark.parametrize('pattern, keys', [
+        (r"\['\D+'\]$", ['Name', 'name']),
+        (r"\['(?-i:Name)'\]$", ['Name']),
+        (r"\['name'\]$", ['Name', 'name']),
+    ])
+    def test_case_insensitive_regex_preserves_dictionary_paths(self, pattern, keys):
+        obj = {'Name': 1, 'name': 2, '123': 3}
+        expected = {'matched_paths': {f"root['{key}']": obj[key] for key in keys}}
+        assert DeepSearch(obj, pattern, use_regexp=True, verbose_level=2) == expected
+
+    @pytest.mark.parametrize('flags, indexes', [(0, [0]), (re.IGNORECASE, [0, 1])])
+    def test_compiled_regex_keeps_its_flags(self, flags, indexes):
+        values = ['ABC', 'abc']
+        expected = {'matched_values': {f'root[{index}]': values[index] for index in indexes}}
+        assert DeepSearch(values, re.compile('ABC', flags), use_regexp=True, verbose_level=2) == expected
+
+    @pytest.mark.parametrize('case_sensitive, expected', [
+        (False, {'matched_values': {'root[0]': r'\D+', 'root[1]': r'\d+'}}),
+        (True, {'matched_values': {'root[0]': r'\D+'}}),
+    ])
+    def test_literal_search_keeps_case_handling(self, case_sensitive, expected):
+        values = [r'\D+', r'\d+', '123']
+        assert DeepSearch(values, r'\D+', case_sensitive=case_sensitive, verbose_level=2) == expected
 
     def test_regex_does_not_match_the_regex_string_itself(self):
         obj = ["We like python", "but not (?:p|t)ython"]
