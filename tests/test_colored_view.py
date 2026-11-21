@@ -164,6 +164,68 @@ def test_colored_compact_view_list_all_items_removed():
     assert result == expected
 
 
+def test_colored_view_dict_all_keys_removed():
+    """Test that removed keys are displayed when a dict becomes empty."""
+    t1 = {'a': 1}
+    t2 = {}
+
+    diff = DeepDiff(t1, t2, view=COLORED_VIEW)
+    result = str(diff)
+
+    expected = f'''{{
+  {RED}"a": {RED}1{RESET}{RESET}
+}}'''
+    assert result == expected
+
+
+def test_colored_view_nested_dict_all_keys_removed():
+    """Test that removed keys are displayed when a nested dict becomes empty."""
+    t1 = {'x': {'a': 1}}
+    t2 = {'x': {}}
+
+    diff = DeepDiff(t1, t2, view=COLORED_VIEW)
+    result = str(diff)
+
+    expected = f'''{{
+  "x": {{
+    {RED}"a": {RED}1{RESET}{RESET}
+  }}
+}}'''
+    assert result == expected
+
+
+def test_colored_compact_view_nested_dict_all_keys_removed():
+    """Test that removed keys are displayed when a nested dict becomes empty with compact view."""
+    t1 = {'x': {'a': 1}, 'y': {'z': 3}}
+    t2 = {'x': {}, 'y': {'z': 3}}
+
+    diff = DeepDiff(t1, t2, view=COLORED_COMPACT_VIEW)
+    result = str(diff)
+
+    expected = f'''{{
+  "x": {{
+    {RED}"a": {RED}1{RESET}{RESET}
+  }},
+  "y": {{...}}
+}}'''
+    assert result == expected
+
+
+def test_colored_view_empty_dict_without_removals():
+    """An empty dict with no removed keys under it is still displayed as {}."""
+    t1 = {'x': {}, 'y': 1}
+    t2 = {'x': {}, 'y': 2}
+
+    diff = DeepDiff(t1, t2, view=COLORED_VIEW)
+    result = str(diff)
+
+    expected = f'''{{
+  "x": {{}},
+  "y": {RED}1{RESET} -> {GREEN}2{RESET}
+}}'''
+    assert result == expected
+
+
 def test_colored_view_list_changes_deletions():
     t1 = [1, 5, 7, 3, 6]
     t2 = [1, 2, 3, 4]
