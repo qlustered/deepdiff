@@ -333,6 +333,12 @@ class Delta:
         """
         Set the element value on an object and if necessary convert the object to the proper mutable type
         """
+        # The new value comes from the stored diff: copy it so the result
+        # never aliases the Delta's own values. Otherwise applying the
+        # same Delta to several objects (the default mutate=False mode)
+        # links all results together and lets one caller corrupt the
+        # Delta for the next.
+        new_value = deepcopy(new_value)
         if isinstance(obj, tuple):
             # Check if it's a NamedTuple and use _replace() to generate a new copy with the change
             if hasattr(obj, '_fields') and hasattr(obj, '_replace'):
@@ -677,16 +683,18 @@ class Delta:
                 # import pytest; pytest.set_trace()
                 obj = self.get_nested_obj(obj=self, elements=elements)
                 is_obj_tuple = isinstance(obj, tuple)
-                for opcode in opcodes:    
+                for opcode in opcodes:
                     if opcode.tag == 'replace':
-                        # Replace items in list a[i1:i2] with b[j1:j2]
-                        transformed.extend(opcode.new_values)
+                        # Replace items in list a[i1:i2] with b[j1:j2].
+                        # Copy the new values: they belong to the stored
+                        # diff and must not be aliased into the result.
+                        transformed.extend(deepcopy(opcode.new_values))
                     elif opcode.tag == 'delete':
                         # Delete items from list a[i1:i2], so we do nothing here
                         continue
                     elif opcode.tag == 'insert':
                         # Insert items from list b[j1:j2] into the new list
-                        transformed.extend(opcode.new_values)
+                        transformed.extend(deepcopy(opcode.new_values))
                     elif opcode.tag == 'equal':
                         # Items are the same in both lists, so we add them to the result
                         transformed.extend(obj[opcode.t1_from_index:opcode.t1_to_index])  # type: ignore

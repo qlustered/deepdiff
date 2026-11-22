@@ -3058,3 +3058,23 @@ class TestDeltaCompareFunc:
         assert [item for item in result if "id" not in item] == [], \
             "Phantom entries (dicts missing 'id') found in result"
         assert result == t2
+
+    def test_delta_applied_twice_results_are_independent(self):
+        # Regression test for #655: values inserted by a Delta were
+        # references into the stored diff, so every application of the
+        # same Delta shared them.
+        delta = Delta(DeepDiff({}, {"tags": []}))
+        left = {} + delta
+        right = {} + delta
+        left["tags"].append("left only")
+        assert right == {"tags": []}
+        assert {} + delta == {"tags": []}
+
+    def test_delta_type_change_mutable_value_is_copied(self):
+        # Same aliasing issue through a type change whose new value is
+        # mutable: editing one result must not leak into the next
+        # application of the Delta.
+        delta = Delta(DeepDiff({"a": None}, {"a": {"k": []}}))
+        first = {"a": None} + delta
+        first["a"]["k"].append(1)
+        assert {"a": None} + delta == {"a": {"k": []}}
