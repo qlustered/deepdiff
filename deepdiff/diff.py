@@ -918,6 +918,7 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
         t1_from_index=None, t1_to_index=None,
         t2_from_index=None, t2_to_index=None,
         match_key_spec: Optional[KeySpec]=None,
+        rejected_indexes=None,
     ) -> List[Tuple[Tuple[int, int], Tuple[Any, Any]]]:
         """
         Given a level get matching pairs. This returns list of two tuples in the form:
@@ -957,6 +958,8 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
                         matches.append(((i, j), (x, y)))
                         x_found = True
                         break
+                    elif rejected_indexes is not None and i == j:
+                        rejected_indexes.add(i)
 
                 if(not x_found):
                     matches.append(((i, -1), (x, ListItemRemovedOrAdded)))
@@ -967,6 +970,8 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
                     matches.append(((-1, j), (ListItemRemovedOrAdded, y)))
             return matches
         except CannotCompare:
+            if rejected_indexes is not None:
+                rejected_indexes.clear()
             return self._compare_in_order(
                 level,
                 t1_from_index=t1_from_index, t1_to_index=t1_to_index,
@@ -1073,11 +1078,13 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
     ):
         # Items are paired by a custom criterion rather than by position or equality.
         custom_pairing = match_key_spec is not None or self.iterable_compare_func is not None
+        rejected_indexes = set()
         for (i, j), (x, y) in self._get_matching_pairs(
             level,
             t1_from_index=t1_from_index, t1_to_index=t1_to_index,
             t2_from_index=t2_from_index, t2_to_index=t2_to_index,
             match_key_spec=match_key_spec,
+            rejected_indexes=rejected_indexes,
         ):
             if self._count_diff() is StopIteration:
                 return  # pragma: no cover. This is already covered for addition.
@@ -1093,6 +1100,7 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
                     child_relationship_param2=reference_param2,
                     )
                 change_level.paired_by_key = match_key_spec is not None
+                change_level.iterable_compare_func_rejected = i in rejected_indexes
                 self._report_result('iterable_item_removed', change_level, local_tree=local_tree)
 
             elif x is ListItemRemovedOrAdded:  # new item added
@@ -1104,6 +1112,7 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
                     child_relationship_param2=reference_param2,
                     )
                 change_level.paired_by_key = match_key_spec is not None
+                change_level.iterable_compare_func_rejected = j in rejected_indexes
                 self._report_result('iterable_item_added', change_level, local_tree=local_tree)
 
             else:  # check if item value has changed
@@ -1524,7 +1533,8 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
             self._stats[MAX_DIFF_LIMIT_REACHED] = True
 
     def _get_most_in_common_pairs_in_iterables(
-            self, hashes_added, hashes_removed, t1_hashtable, t2_hashtable, parents_ids, _original_type):
+            self, hashes_added, hashes_removed, t1_hashtable, t2_hashtable, parents_ids, _original_type,
+            rejected_pairs=None):
         """
         Get the closest pairs between items that are removed and items that are added.
 
@@ -1551,7 +1561,13 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
             if cached_pairs is not_found:
                 cached_pairs = None
             else:
-                return cast(dict, cached_pairs).copy()
+                pairs, cached_rejections = cached_pairs
+                if rejected_pairs is not None:
+                    rejected_pairs.update(cached_rejections)
+                return pairs.copy()
+
+        if rejected_pairs is None:
+            rejected_pairs = set()
 
         # A dictionary of hashes to distances and each distance to an ordered set of hashes.
         # It tells us about the distance of each object from other objects.
@@ -1575,7 +1591,7 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
                 and self.iterable_compare_func \
                 and len(hashes_added) > 0 and len(hashes_removed) > 0:
             pre_calced_distances = self._precalculate_distance_by_custom_compare_func(
-                hashes_added, hashes_removed, t1_hashtable, t2_hashtable, _original_type)
+                hashes_added, hashes_removed, t1_hashtable, t2_hashtable, _original_type, rejected_pairs)
 
         # Optionally precompute non-cached distances in worker processes.
         # Returns a dict keyed by (added_hash, removed_hash). Pair selection
@@ -1636,7 +1652,7 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
         inverse_pairs = {v: k for k, v in pairs.items()}
         pairs.update(inverse_pairs)
         if cache_key and self._stats[DISTANCE_CACHE_ENABLED]:
-            self._distance_cache.set(cache_key, value=pairs)
+            self._distance_cache.set(cache_key, value=(pairs, rejected_pairs.copy()))
         return pairs.copy()
 
     def _subtree_parallel_safe(self):
@@ -1801,10 +1817,12 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
         else:
             t1_hashtable = {k: v for k, v in full_t1_hashtable.items() if k in hashes_removed}
             t2_hashtable = {k: v for k, v in full_t2_hashtable.items() if k in hashes_added}
+        rejected_pairs = set()
         if self._stats[PASSES_COUNT] < self.max_passes and get_pairs:
             self._stats[PASSES_COUNT] += 1
             pairs = self._get_most_in_common_pairs_in_iterables(
-                hashes_added, hashes_removed, t1_hashtable, t2_hashtable, parents_ids, _original_type)
+                hashes_added, hashes_removed, t1_hashtable, t2_hashtable, parents_ids, _original_type,
+                rejected_pairs)
         elif get_pairs:
             if not self._stats[MAX_PASS_LIMIT_REACHED]:
                 self._stats[MAX_PASS_LIMIT_REACHED] = True
@@ -1812,6 +1830,12 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
             pairs = dict_()
         else:
             pairs = dict_()
+
+        rejected_indexes = {
+            t2_hashtable[added_hash].indexes[0]
+            for added_hash, removed_hash in rejected_pairs
+            if t2_hashtable[added_hash].indexes[0] == t1_hashtable[removed_hash].indexes[0]
+        }
 
         def get_other_pair(hash_value, in_t1=True):
             """
@@ -1951,6 +1975,7 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
                     child_relationship_param2=index2,
                 )
                 if other.item is notpresent:
+                    change_level.iterable_compare_func_rejected = index in rejected_indexes
                     self._report_result('iterable_item_added', change_level, local_tree=local_tree)
                 else:
                     parents_ids_added = add_to_frozen_set(parents_ids, item_id)
@@ -1975,6 +2000,7 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
                     child_relationship_param2=index2,
                 )
                 if other.item is notpresent:
+                    change_level.iterable_compare_func_rejected = index in rejected_indexes
                     self._report_result('iterable_item_removed', change_level, local_tree=local_tree)
                 else:
                     # Just like the case when report_repetition = True, these lines never run currently.

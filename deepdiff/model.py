@@ -74,6 +74,8 @@ class TreeResult(ResultDict):
             mutual_paths = {
                 path for path in set(added_paths) & set(removed_paths)
                 if not (added_paths[path].paired_by_key or removed_paths[path].paired_by_key)
+                and not (added_paths[path].iterable_compare_func_rejected
+                         or removed_paths[path].iterable_compare_func_rejected)
             }
 
             if mutual_paths and 'values_changed' not in self or self['values_changed'] is None:
@@ -596,6 +598,10 @@ class DiffLevel:
         # iterable_match_keys. Such an add and remove at the same index are different records,
         # so they are not merged into values_changed.
         self.paired_by_key = False
+
+        # A same-index pair explicitly rejected by iterable_compare_func must
+        # remain an addition/removal, rather than becoming values_changed.
+        self.iterable_compare_func_rejected = False
 
     def __repr__(self) -> str:
         if self.verbose_level:
