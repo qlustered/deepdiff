@@ -4,7 +4,7 @@ from copy import copy
 from typing import Any, Dict, List, Optional, Set, Union, Literal, Type, TYPE_CHECKING
 from deepdiff.helper import (
     RemapDict, strings, notpresent, get_type, numpy_numbers, np, literal_eval_extended,
-    dict_, SetOrdered)
+    dict_, SetOrdered, pypy3)
 from deepdiff.path import stringify_element
 
 if TYPE_CHECKING:
@@ -824,20 +824,30 @@ class DiffLevel:
         return branch.create_deeper(new_t1, new_t2, child_relationship_class,
                                     child_relationship_param, child_relationship_param2, report_type)
 
+    @staticmethod
+    def _shallow_copy(level: 'DiffLevel') -> 'DiffLevel':
+        # Same result as copy.copy(level), without the generic __reduce_ex__ round trip.
+        # PyPy runs copy.copy faster, so keep it there.
+        if pypy3:
+            return copy(level)
+        new = object.__new__(level.__class__)
+        new.__dict__.update(level.__dict__)
+        return new
+
     def copy(self) -> 'DiffLevel':
         """
         Get a deep copy of this comparison line.
         :return: The leaf ("downmost") object of the copy.
         """
         orig = self.all_up
-        result = copy(orig)  # copy top level
+        result = self._shallow_copy(orig)  # copy top level
 
         while orig is not None:
             result.additional = copy(orig.additional)
 
             if orig.down is not None:  # copy and create references to the following level
                 # copy following level
-                result.down = copy(orig.down)
+                result.down = self._shallow_copy(orig.down)
 
                 if orig.t1_child_rel is not None:
                     result.t1_child_rel = ChildRelationship.create(
