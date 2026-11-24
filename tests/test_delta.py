@@ -664,6 +664,21 @@ class TestBasicsOfDelta:
         assert "_iterable_opcodes" in delta.diff
         assert t2 == t1 + delta
 
+    def test_nested_tuple_iterable_opcodes_preserves_parent(self):
+        t1 = {"a": tuple("A B C D H".split()), "b": "keep"}
+        t2 = {"a": tuple("B C D H Y Z".split()), "b": "keep"}
+        delta = Delta(DeepDiff(t1, t2), bidirectional=True)
+
+        assert "_iterable_opcodes" in delta.diff
+        assert t2 == t1 + delta
+
+        nested1 = {"x": {"a": tuple("A B C D H".split()), "b": "keep"}}
+        nested2 = {"x": {"a": tuple("B C D H Y Z".split()), "b": "keep"}}
+        nested_delta = Delta(DeepDiff(nested1, nested2), bidirectional=True)
+
+        assert "_iterable_opcodes" in nested_delta.diff
+        assert nested2 == nested1 + nested_delta
+
     def test_complex_dictionary_keys_removed_delta(self):
         t1 = {1 + 2j: "a", 3 + 4j: "b"}
         t2 = {}

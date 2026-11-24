@@ -668,10 +668,13 @@ class Delta:
                 if elem_and_details:
                     elements, parent, parent_to_obj_elem, parent_to_obj_action, obj, elem, action = elem_and_details
                     if parent is None:
-                        parent = self
-                        obj = self.root
-                        parent_to_obj_elem = 'root'
-                        parent_to_obj_action = GETATTR
+                        target_parent = self
+                        target_elem = 'root'
+                        target_action = GETATTR
+                    else:
+                        target_parent = obj
+                        target_elem = elem
+                        target_action = action
                 else:
                     continue  # pragma: no cover. Due to cPython peephole optimizer, this line doesn't get covered. https://github.com/nedbat/coveragepy/issues/198
                 # import pytest; pytest.set_trace()
@@ -694,8 +697,8 @@ class Delta:
                     obj = tuple(transformed)  # type: ignore
                     # Making sure that the object is re-instated inside the parent especially if it was immutable
                     # and we had to turn it into a mutable one. In such cases the object has a new id.
-                    self._simple_set_elem_value(obj=parent, path_for_err_reporting=path, elem=parent_to_obj_elem,
-                                                value=obj, action=parent_to_obj_action)
+                    self._simple_set_elem_value(obj=target_parent, path_for_err_reporting=path, elem=target_elem,
+                                                value=obj, action=target_action)
                 else:
                     obj[:] = transformed  # type: ignore
 
