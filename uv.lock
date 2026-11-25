@@ -464,7 +464,7 @@ wheels = [
 
 [[package]]
 name = "deepdiff"
-version = "9.1.0"
+version = "9.2.1"
 source = { editable = "." }
 dependencies = [
     { name = "orderly-set" },
