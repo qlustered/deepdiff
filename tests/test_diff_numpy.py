@@ -1,5 +1,5 @@
 import pytest
-from deepdiff import DeepDiff
+from deepdiff import DeepDiff, Delta
 from deepdiff.helper import np
 from tests import parameterize_cases
 
@@ -174,3 +174,52 @@ class TestNumpy:
     def test_numpy(self, test_name, t1, t2, deepdiff_kwargs, expected_result):
         diff = DeepDiff(t1, t2, **deepdiff_kwargs)
         assert expected_result == diff, f"test_numpy {test_name} failed."
+
+
+@pytest.mark.parametrize('ignore_order', [False, True])
+@pytest.mark.parametrize('before, after', [(1, 2), (1.5, 2.5), ('a', 'b'), (True, False)])
+def test_zero_dimensional_array_values(before, after, ignore_order):
+    options = {'ignore_order': ignore_order}
+    assert DeepDiff(np.array(before), np.array(after), **options) == {
+        'values_changed': {'root': {'old_value': before, 'new_value': after}}
+    }
+    assert not DeepDiff(np.array(before), np.array(before), **options)
+    assert DeepDiff({'value': np.array(before)}, {'value': np.array(after)}, **options) == {
+        'values_changed': {"root['value']": {'old_value': before, 'new_value': after}}
+    }
+
+
+@pytest.mark.parametrize('ignore_order', [False, True])
+def test_zero_dimensional_array_comparison_options(ignore_order):
+    assert not DeepDiff(np.array(1.01), np.array(1.02), significant_digits=1, ignore_order=ignore_order)
+    assert not DeepDiff(np.array(1.01), np.array(1.02), math_epsilon=0.1, ignore_order=ignore_order)
+    assert not DeepDiff(np.array(float('nan')), np.array(float('nan')),
+                        ignore_nan_inequality=True, ignore_order=ignore_order)
+    assert not DeepDiff(np.array(1), np.array(1.0), ignore_numeric_type_changes=True, ignore_order=ignore_order)
+
+
+@pytest.mark.parametrize('before, after', [(1, 2), (1.5, 2.5), (True, False), (1, [1]), ([1], 1)])
+def test_zero_dimensional_array_delta(before, after):
+    t1, t2 = np.array(before), np.array(after)
+    result = Delta(DeepDiff(t1, t2)) + t1
+    assert isinstance(result, np.ndarray)
+    assert result.shape == t2.shape
+    np.testing.assert_array_equal(result, t2)
+
+
+def test_nested_zero_dimensional_array_delta():
+    t1 = {'value': np.array(1)}
+    t2 = {'value': np.array(2)}
+    result = Delta(DeepDiff(t1, t2)) + t1
+    assert isinstance(result['value'], np.ndarray)
+    assert result['value'].shape == ()
+    np.testing.assert_array_equal(result['value'], t2['value'])
+
+
+def test_zero_dimensional_array_delta_rejects_invalid_dtype():
+    from deepdiff.delta import DeltaError
+
+    delta = Delta({'values_changed': {'root': {'new_value': 2}},
+                   '_numpy_paths': {'root': 'invalid_dtype'}}, raise_errors=True)
+    with pytest.raises(DeltaError, match='not a valid numpy type'):
+        delta + np.array(1)

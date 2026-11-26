@@ -2067,6 +2067,15 @@ class DeepDiff(ResultDict, SerializationMixin, DistanceMixin, DeepDiffProtocol, 
             # which means numpy module needs to be available. So np can't be None.
             raise ImportError(CANT_FIND_NUMPY_MSG)  # pragma: no cover
 
+        # A zero-dimensional array contains a scalar and cannot be iterated.
+        # Dispatch its Python value normally, also handling scalar/array shape
+        # changes instead of passing a scalar into the iterable comparison.
+        if level.t1.ndim == 0 or level.t2.ndim == 0:
+            level.t1 = level.t1.tolist()
+            level.t2 = level.t2.tolist()
+            self._diff(level, parents_ids, local_tree=local_tree)
+            return
+
         if (self.ignore_order_func and not self.ignore_order_func(level)) or not self.ignore_order:
             # fast checks
             if self.significant_digits is None:
