@@ -93,7 +93,8 @@ class ColoredView:
             return '{...}' if isinstance(obj, dict) else '[...]'
 
         if isinstance(obj, dict):
-            if not obj:
+            removed_map = self._get_path_removed(path)
+            if not obj and not removed_map:
                 return '{}'
             items = []
             for key, value in obj.items():
@@ -103,7 +104,7 @@ class ColoredView:
                     items.append(f'{next_indent}{GREEN}"{key}": {self._colorize_json(value, new_path, indent + 1)}{RESET}')
                 else:
                     items.append(f'{next_indent}"{key}": {self._colorize_json(value, new_path, indent + 1)}')
-            for key, value in self._get_path_removed(path).items():
+            for key, value in removed_map.items():
                 new_path = f"{path}['{key}']" if isinstance(key, str) else f"{path}[{key}]"
                 items.append(f'{next_indent}{RED}"{key}": {self._colorize_json(value, new_path, indent + 1)}{RESET}')
             return '{\n' + ',\n'.join(items) + f'\n{current_indent}' + '}'
