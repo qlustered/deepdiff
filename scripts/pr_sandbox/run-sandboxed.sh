@@ -7,7 +7,10 @@
 #
 #   SRC_DIR            directory holding the untrusted deepdiff/, tests/ and (optionally) conftest.py.
 #                      Nothing else from it is used: dependencies and pytest config come from the
-#                      trusted checkout this script lives in.
+#                      trusted checkout this script lives in (or from --deps-dir).
+#   --deps-dir DIR     take uv.lock and pyproject.toml from DIR instead of the trusted checkout,
+#                      e.g. ones extracted from an older commit of your own branch (sandbox-pr.sh
+#                      --deps-from merge-base). DIR must never hold files from the PR.
 #   --python VER       Python version for the sandbox venv (default: $PR_SANDBOX_PYTHON or 3.15)
 #   --out DIR          where to put the work dir and reports (default: a new temp dir)
 #   --fail-on LEVEL    critical|high|medium|low: findings at or above this fail the run (default: high)
@@ -17,6 +20,8 @@
 # Environment:
 #   PR_SANDBOX_SHARE_GROUP   group to make the reports readable by (default: ai-dev, if it exists
 #                            and you're a member; "" disables)
+#   PR_SANDBOX_SOURCE        what SRC_DIR was taken from, recorded in report/source.txt
+#                            (sandbox-pr.sh sets it, e.g. "pr 618 <sha>" or "merge <sha> ...")
 #
 # Exit status: 2 if findings reached --fail-on, otherwise pytest's exit status (0 with --monitor-only).
 #
@@ -27,6 +32,7 @@ set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 TRUSTED_ROOT=$(cd "$SCRIPT_DIR/../.." && pwd)
+DEPS_ROOT=$TRUSTED_ROOT
 PYVER=${PR_SANDBOX_PYTHON:-3.15}
 OUT=""
 FAIL_ON=high
@@ -38,11 +44,12 @@ die() { echo "run-sandboxed: $*" >&2; exit 1; }
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --python) PYVER=$2; shift 2 ;;
+        --deps-dir) DEPS_ROOT=$(cd "$2" && pwd); shift 2 ;;
         --out) OUT=$2; shift 2 ;;
         --fail-on) FAIL_ON=$2; shift 2 ;;
         --monitor-only) MONITOR_ONLY=1; shift ;;
         --no-strace) USE_STRACE=0; shift ;;
-        -h|--help) sed -n '2,25p' "$0"; exit 0 ;;
+        -h|--help) sed -n '2,28p' "$0"; exit 0 ;;
         --) die "SRC_DIR must come before --" ;;
         -*) die "unknown option $1" ;;
         *) break ;;
@@ -58,6 +65,7 @@ PYTEST_ARGS=("$@")
 [[ ${#PYTEST_ARGS[@]} -gt 0 ]] || PYTEST_ARGS=(tests)
 
 [[ -d $SRC/deepdiff && -d $SRC/tests ]] || die "$SRC must contain deepdiff/ and tests/"
+[[ -f $DEPS_ROOT/uv.lock && -f $DEPS_ROOT/pyproject.toml ]] || die "$DEPS_ROOT must contain uv.lock and pyproject.toml"
 for tool in bwrap uv python3; do command -v "$tool" >/dev/null || die "$tool is required"; done
 if [[ $USE_STRACE == 1 ]]; then command -v strace >/dev/null || die "strace is required (or pass --no-strace)"; fi
 
@@ -68,6 +76,7 @@ WORK=$(cd "$OUT" && pwd)
 mkdir -p "$WORK"/{src,home,audit,etc,report}
 REPORT=$WORK/report
 echo "==> work dir: $WORK"
+[[ -z ${PR_SANDBOX_SOURCE:-} ]] || printf '%s\n' "$PR_SANDBOX_SOURCE" >"$REPORT/source.txt"
 
 # Make the reports readable by a shared group, e.g. so an agent running as another user can
 # read them. Defaults to "ai-dev" if that group exists and you're in it. Set
@@ -93,7 +102,8 @@ trap share_reports EXIT
 #    `uv sync` installs, so building an sdist here (e.g. pyyaml on a new Python) is no new risk.
 # ---------------------------------------------------------------------------
 REQ=$WORK/requirements.txt
-(cd "$TRUSTED_ROOT" && uv export --quiet --frozen --no-emit-project \
+[[ $DEPS_ROOT == "$TRUSTED_ROOT" ]] || echo "==> dependencies and pytest config from $DEPS_ROOT"
+(cd "$DEPS_ROOT" && uv export --quiet --frozen --no-emit-project \
     --extra cli --extra dev --extra static --extra test --extra coverage -o "$REQ")
 KEY=$( (cat "$REQ"; echo "$PYVER") | sha256sum | cut -c1-16)
 CACHE=${XDG_CACHE_HOME:-$HOME/.cache}/deepdiff-pr-sandbox
@@ -103,7 +113,8 @@ if [[ ! -f $VENV/.complete ]]; then
     rm -rf "$VENV"
     mkdir -p "$CACHE"
     uv venv --quiet --python "$PYVER" "$VENV"
-    uv pip install --quiet --python "$VENV/bin/python" --require-hashes -r "$REQ"
+    uv pip install --quiet --python "$VENV/bin/python" --require-hashes -r "$REQ" ||
+        die "installing dependencies failed. An older lockfile (--deps-dir) may have no wheels for python $PYVER: try an older --python"
     # Pre-compile so nothing tries to write bytecode into the read-only venv mount.
     "$VENV/bin/python" -I -m compileall -q -j 0 "$VENV/lib" >/dev/null || true
     touch "$VENV/.complete"
@@ -117,11 +128,11 @@ PY_LINK_PREFIX=$(dirname "$(dirname "$(readlink "$VENV/bin/python")")")
 
 # ---------------------------------------------------------------------------
 # 2. Untrusted sources. Only deepdiff/, tests/ and conftest.py are taken from the PR;
-#    pyproject.toml (pytest config) comes from the trusted checkout.
+#    pyproject.toml (pytest config) comes from the trusted checkout (or --deps-dir).
 # ---------------------------------------------------------------------------
 cp -a "$SRC/deepdiff" "$SRC/tests" "$WORK/src/"
 [[ -f $SRC/conftest.py ]] && cp -a "$SRC/conftest.py" "$WORK/src/"
-cp "$TRUSTED_ROOT/pyproject.toml" "$WORK/src/pyproject.toml"
+cp "$DEPS_ROOT/pyproject.toml" "$WORK/src/pyproject.toml"
 
 # ---------------------------------------------------------------------------
 # 3. Fake home with canary credentials. It's mounted at the real $HOME path so the

@@ -16,6 +16,16 @@ make pr-review  PR=612      # start Claude on the PR and its sandbox report, aut
 make pr-clean               # delete fetched PR refs and sandbox work dirs
 ```
 
+For a stale PR (one that conflicts with `dev`, or whose contributor won't rebase), use
+`make pr-merge` instead of `make pr-sandbox`. It merges `dev` into the PR and tests the merge.
+See [Stale PRs: `make pr-merge`](#stale-prs-make-pr-merge):
+
+```bash
+make pr-merge   PR=618      # merge dev into the PR, AI-resolve conflicts, you review, then sandbox
+make pr-review  PR=618      # same review, plus the conflict resolution
+make pr-push    PR=618      # push the merge to the PR's branch (asks first)
+```
+
 `make pr-review` runs your `claude` command from an interactive zsh, so a zshrc wrapper
 (e.g. one that switches user) is used. It needs that wrapper to pass its arguments through
 and keep the current directory. It starts Claude in `dontAsk` mode with
@@ -31,7 +41,8 @@ and keep the current directory. It starts Claude in `dontAsk` mode with
 
 The initial prompt comes from `review-prompt.md`. Nothing is written to
 `.claude/settings.local.json`, so your other sessions keep their mode. Options:
-`BASE=master`, `TESTS="tests/test_x.py -x"`, `OPTS="--fail-on medium"`, `CLAUDE_CMD=...`.
+`BASE=master`, `TESTS="tests/test_x.py -x"`, `DEPS=merge-base`, `OPTS="--fail-on medium"`,
+`CLAUDE_CMD=...`.
 
 The scripts can also be run directly:
 
@@ -40,6 +51,8 @@ The scripts can also be run directly:
 scripts/pr_sandbox/sandbox-pr.sh 660                     # review risky files, then run the tests
 scripts/pr_sandbox/sandbox-pr.sh 660 -- tests/test_tsv.py -x
 scripts/pr_sandbox/sandbox-pr.sh --base master 661       # PR targeting master
+scripts/pr_sandbox/sandbox-pr.sh --deps-from merge-base 618  # stale PR: deps from its merge-base
+scripts/pr_sandbox/merge-pr.py merge 618                # stale PR: merge dev into it, then sandbox
 scripts/pr_sandbox/run-sandboxed.sh path/to/src          # any directory with deepdiff/ + tests/
 ```
 
@@ -61,6 +74,10 @@ Reports are written to the `report/` dir that the output names: `report.md`, `fi
    Dependencies are installed from *your* `uv.lock` (hash-checked), and the pytest config comes
    from *your* `pyproject.toml`. The PR's build backend, `noxfile.py` and dependency changes
    never run.
+
+   An old PR's `deepdiff/` can still import a dependency that your branch has since dropped
+   (e.g. `cachebox`), so its tests fail at import. Use `make pr-merge` (see below) to test it
+   merged with your branch.
 4. **Sandbox** (`bwrap`):
    - no network (an empty network namespace)
    - its own PID/IPC/UTS namespaces and no controlling terminal (`--new-session` blocks
@@ -94,6 +111,61 @@ A clean run of the current test suite has no MEDIUM or higher findings. Its LOW 
 known helpers such as pytest-benchmark calling `git`/`hg` and `platform` calling `file`. If a
 legitimate change trips a rule, add to the allowlists at the top of `analyze.py` with a comment
 explaining why. Don't loosen the rules to make a PR pass.
+
+## Stale PRs: `make pr-merge`
+
+When a PR has gone stale (it conflicts with `dev`, or its code still needs a dependency `dev`
+has dropped) and the contributor won't rebase it, bring it up to date yourself:
+
+```bash
+make pr-merge PR=618        # BASE=master for PRs to master
+```
+
+It goes through six numbered steps and says at each one what it's doing and what it needs
+from you:
+
+1. **Fetch** the PR and `dev` into `refs/pr-sandbox/` (no checkout).
+2. **Merge `dev` into the PR in memory** with `git merge-tree`. Nothing is checked out, so none
+   of the PR's files (`.envrc`, `.claude/`, `CLAUDE.md`, hooks) land in a working tree. A merge
+   (rather than a rebase) keeps the contributor's commits as they are, so it can be pushed to
+   their branch as a fast-forward.
+3. **Resolve conflicts with a locked-down Claude agent.** Only copies of the conflicted files
+   go into a scratch dir, renamed to `conflicts/NN.txt` (so a conflicted `CLAUDE.md` or
+   `.claude/settings.json` is never loaded as config), along with each side's diff and commit
+   subjects. The agent runs with `claude -p --restricted --tools Read,Edit,Write,Glob,Grep
+   --strict-mcp-config`: no shell, no web, no MCP connectors, user and project settings ignored.
+   A guard hook (`merge-guard.py`) confines its reads to the scratch dir and its writes to
+   `conflicts/*` and `notes.md`, and logs every call. Before using the result, `merge-pr.py`
+   checks the session's reported tools, MCP servers and permission mode, and checks that the
+   guard saw every tool call. If anything doesn't match, it stops. The prompt is
+   `merge-prompt.md`.
+4. **Review.** For each conflict you see the PR's side, `dev`'s side and the resolution, plus
+   the agent's notes. Lines the agent starts with `UNCERTAIN:` or `SUSPICIOUS:`, leftover
+   markers and edits outside the conflict blocks are flagged. `[a]ccept`, `[e]dit` (your
+   `$EDITOR`, with vim modelines off), `[d]iff` against `dev`, or `[q]uit`. Nothing is
+   committed before you accept.
+5. **Commit** the merge straight to git objects (first parent: the PR head; second: `dev`) as
+   `refs/pr-sandbox/<N>-merge`. It's reused on the next run as long as neither side has moved
+   (`REDO=1` to redo it).
+6. **Sandbox** the merge with `sandbox-pr.sh --ref`: the usual risky-file triage and
+   confirmation, then the tests with your *current* `uv.lock`.
+
+Then `make pr-review PR=<N>` reviews the PR and the report as usual. It also reads the merge's
+conflict resolution (`resolution.diff`, i.e. `git show --cc`) and the agent's notes.
+`make pr-push PR=<N>` pushes the merge commit to the contributor's branch after asking, so the
+PR becomes mergeable on GitHub. If they didn't allow edits by maintainers, it offers to push
+the merge as `pr-<N>-merged` and open a new PR from it. The contributor's commits stay in the
+history either way.
+
+Options: `AGENT=0` resolves in your editor instead of with the agent. A conflict it can't
+handle (rename/delete, binary, symlink...) stops with instructions to merge by hand in a
+throwaway worktree, then continue with `COMMIT=<sha>`. A `uv.lock` conflict is resolved by
+taking `dev`'s lockfile: run `uv lock` afterwards if the PR changed dependencies.
+
+To test a stale PR exactly as written instead (against the `dev` it was built on), use
+`make pr-sandbox PR=<N> DEPS=merge-base`. `uv.lock` and `pyproject.toml` are then taken from
+the PR's merge-base, which is still your own history, never the PR's. An old lockfile may
+lack wheels for the default Python, so add `OPTS="--python 3.14"`.
 
 ## CI
 
