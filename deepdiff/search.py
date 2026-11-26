@@ -236,6 +236,8 @@ class DeepSearch(Dict[str, Union[Dict[str, Any], SetOrdered, List[str]]]):
             parents_ids_added = add_to_frozen_set(parents_ids, item_id)
 
             new_parent = parent_text % (parent, item_key_str)
+            if self.__skip_this(obj_child, new_parent):
+                continue
             new_parent_cased = new_parent if self.case_sensitive else new_parent.lower()
 
             str_item = str(item)
