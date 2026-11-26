@@ -105,7 +105,8 @@ class DistanceMixin:
         )
 
     def _precalculate_distance_by_custom_compare_func(
-            self: "DistanceProtocol", hashes_added, hashes_removed, t1_hashtable, t2_hashtable, _original_type):
+            self: "DistanceProtocol", hashes_added, hashes_removed, t1_hashtable, t2_hashtable, _original_type,
+            rejected_pairs=None):
         pre_calced_distances = dict_()
         if self.iterable_compare_func is None:
             return pre_calced_distances
@@ -122,6 +123,8 @@ class DistanceMixin:
                         distance = self.math_epsilon or 0.000001
                     else:
                         distance = 1
+                        if rejected_pairs is not None:
+                            rejected_pairs.add((added_hash, removed_hash))
                     pre_calced_distances["{}--{}".format(added_hash, removed_hash)] = distance
 
         return pre_calced_distances

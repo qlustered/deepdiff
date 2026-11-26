@@ -183,6 +183,7 @@ class Delta:
         else:
             self.root = deepcopy(other)
         self._do_pre_process()
+        self._do_moved_item_replacements()
         self._do_values_changed()
         self._do_set_item_added()
         self._do_set_item_removed()
@@ -397,6 +398,7 @@ class Delta:
         # This will then get replaced below after we go through added items.
         # Without this items can get double added because moved store the new_value and does not need item_added replayed
         if iterable_item_moved:
+            iterable_item_added = self._without_moved_item_children(iterable_item_added, iterable_item_moved)
             added_dict = {v["new_path"]: None for k, v in iterable_item_moved.items()}
             iterable_item_added.update(added_dict)
 
@@ -713,9 +715,45 @@ class Delta:
             # These will get added back during items_added
             removed_dict = {k: v["value"] for k, v in iterable_item_moved.items()}
             iterable_item_removed.update(removed_dict)
+            iterable_item_removed = self._without_moved_item_children(iterable_item_removed, iterable_item_moved)
 
         if iterable_item_removed:
             self._do_item_removed(iterable_item_removed)
+
+    def _do_moved_item_replacements(self):
+        added = self.diff.get('iterable_item_added', {})
+        removed = self.diff.get('iterable_item_removed', {})
+        moves = [(_path_to_elements(move['new_path']), _path_to_elements(path))
+                 for path, move in self.diff.get('iterable_item_moved', {}).items()
+                 if path != move['new_path'] and 'value' in move]
+        # Apply replacements at the source before moving the whole record. In
+        # particular, bidirectional verification must see the updated record.
+        # More deeply nested moves take precedence over their moved parents.
+        moves.sort(key=lambda pair: len(pair[0]), reverse=True)
+        replacements = {}
+        for path in added.keys() & removed.keys():
+            elements = _path_to_elements(path)
+            for target, source in moves:
+                if len(elements) > len(target) and elements[:len(target)] == target:
+                    source_path = stringify_path((source + elements[len(target):])[1:])
+                    replacements[source_path] = {'old_value': removed[path], 'new_value': added[path]}
+                    break
+        if replacements:
+            self._do_values_or_type_changed(replacements)
+
+    @staticmethod
+    def _without_moved_item_children(changes, moves):
+        # A move installs the complete target value. Its nested additions and
+        # removals use target paths and must not be replayed on the old record
+        # or the temporary None placeholder used while inserting moved items.
+        moved_paths = [_path_to_elements(move['new_path']) for path, move in moves.items()
+                       if path != move['new_path'] and 'value' in move]
+        result = {}
+        for path, value in changes.items():
+            elements = _path_to_elements(path)
+            if not any(len(elements) > len(parent) and elements[:len(parent)] == parent for parent in moved_paths):
+                result[path] = value
+        return result
 
     def _do_dictionary_item_removed(self):
         dictionary_item_removed = self.diff.get('dictionary_item_removed')
