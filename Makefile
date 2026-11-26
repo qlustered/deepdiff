@@ -6,11 +6,14 @@
 #
 # Options: BASE=master                 branch the PR targets (default: dev)
 #          TESTS="tests/test_x.py -x"  pytest arguments (default: the whole suite)
+#          DEPS=merge-base             take uv.lock/pyproject.toml from the PR's merge-base with BASE
+#                                      instead of this checkout (for stale PRs; default: checkout)
 #          OPTS="--fail-on medium"     extra sandbox-pr.sh options (--python, --no-strace, --remote ...)
 #          CLAUDE_CMD=...              default: the `claude` command from your interactive zsh
 
 SHELL := /bin/bash
 BASE ?= dev
+DEPS ?= checkout
 PR_TMP ?= /tmp
 CLAUDE_CMD ?= claude
 SANDBOX := scripts/pr_sandbox
@@ -33,6 +36,9 @@ help:
 	@echo "Options:"
 	@echo "  BASE=master                 Branch the PR targets (default: dev)"
 	@echo "  TESTS=\"tests/test_x.py -x\"  pytest arguments for pr-sandbox (default: whole suite)"
+	@echo "  DEPS=merge-base             Install dependencies from the PR's merge-base with BASE instead"
+	@echo "                              of this checkout. For stale PRs that still need a dependency"
+	@echo "                              the current branch dropped (default: checkout)"
 	@echo "  OPTS=\"--fail-on medium\"     Extra sandbox-pr.sh options (--python, --no-strace, --remote)"
 	@echo "  CLAUDE_CMD=...              Command pr-review launches (default: claude from your zsh)"
 	@echo
@@ -42,7 +48,7 @@ _require-pr:
 	@[[ "$(PR)" =~ ^[0-9]+$$ ]] || { echo "usage: make $(firstword $(MAKECMDGOALS)) PR=<number>" >&2; exit 1; }
 
 pr-sandbox: _require-pr
-	$(SANDBOX)/sandbox-pr.sh --base "$(BASE)" \
+	$(SANDBOX)/sandbox-pr.sh --base "$(BASE)" --deps-from "$(DEPS)" \
 		--out "$(PR_TMP)/deepdiff-pr-$(PR)-$$(date +%Y%m%d-%H%M%S)" $(OPTS) $(PR) $(if $(TESTS),-- $(TESTS))
 
 # Runs your `claude` from an interactive zsh so the zshrc wrapper (which switches to

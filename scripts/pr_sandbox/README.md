@@ -31,7 +31,8 @@ and keep the current directory. It starts Claude in `dontAsk` mode with
 
 The initial prompt comes from `review-prompt.md`. Nothing is written to
 `.claude/settings.local.json`, so your other sessions keep their mode. Options:
-`BASE=master`, `TESTS="tests/test_x.py -x"`, `OPTS="--fail-on medium"`, `CLAUDE_CMD=...`.
+`BASE=master`, `TESTS="tests/test_x.py -x"`, `DEPS=merge-base`, `OPTS="--fail-on medium"`,
+`CLAUDE_CMD=...`.
 
 The scripts can also be run directly:
 
@@ -40,6 +41,7 @@ The scripts can also be run directly:
 scripts/pr_sandbox/sandbox-pr.sh 660                     # review risky files, then run the tests
 scripts/pr_sandbox/sandbox-pr.sh 660 -- tests/test_tsv.py -x
 scripts/pr_sandbox/sandbox-pr.sh --base master 661       # PR targeting master
+scripts/pr_sandbox/sandbox-pr.sh --deps-from merge-base 618  # stale PR: deps from its merge-base
 scripts/pr_sandbox/run-sandboxed.sh path/to/src          # any directory with deepdiff/ + tests/
 ```
 
@@ -61,6 +63,15 @@ Reports are written to the `report/` dir that the output names: `report.md`, `fi
    Dependencies are installed from *your* `uv.lock` (hash-checked), and the pytest config comes
    from *your* `pyproject.toml`. The PR's build backend, `noxfile.py` and dependency changes
    never run.
+
+   **Stale PRs.** An old PR's `deepdiff/` can still import a dependency that your current
+   branch has since dropped (e.g. `cachebox`), so its tests fail at import. Run it with
+   `make pr-sandbox PR=<N> DEPS=merge-base` (`--deps-from merge-base`): `uv.lock` and
+   `pyproject.toml` are then taken from the PR's merge-base with `BASE`, the commit of your own
+   branch the PR was built on. That commit is in your branch's history, so the lockfile is
+   still yours, never the PR's. An old lockfile may lack wheels for the default Python; add
+   `OPTS="--python 3.14"` if the install fails. This tests the PR as written, not as merged,
+   so still check the merged result before release.
 4. **Sandbox** (`bwrap`):
    - no network (an empty network namespace)
    - its own PID/IPC/UTS namespaces and no controlling terminal (`--new-session` blocks

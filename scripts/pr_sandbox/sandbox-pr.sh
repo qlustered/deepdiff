@@ -1,10 +1,18 @@
 #!/usr/bin/env bash
 # Review and test a GitHub PR without running its code on your machine.
 #
-# Usage: sandbox-pr.sh [--remote NAME] [--base BRANCH] [--yes] [RUN_OPTIONS...] PR_NUMBER [-- PYTEST_ARGS...]
+# Usage: sandbox-pr.sh [--remote NAME] [--base BRANCH] [--deps-from WHERE] [--yes] [RUN_OPTIONS...]
+#                      PR_NUMBER [-- PYTEST_ARGS...]
 #
 #   --remote NAME   git remote of the upstream repo (default: origin)
 #   --base BRANCH   branch the PR targets (default: dev)
+#   --deps-from WHERE
+#                   checkout (default): dependencies (uv.lock) and pytest config (pyproject.toml)
+#                   come from this checkout.
+#                   merge-base: they come from the merge-base of the PR with BRANCH, i.e. the
+#                   commit of your own branch the PR was built on. Use it for stale PRs whose
+#                   code still needs dependencies the current branch has dropped. It's as
+#                   trusted as the checkout: that commit is in BRANCH's history, not the PR's.
 #   --yes           don't stop for confirmation after showing the risky-file diff
 #   RUN_OPTIONS     passed through to run-sandboxed.sh (--python, --out, --fail-on, --no-strace)
 #
@@ -17,13 +25,15 @@
 #      them with run-sandboxed.sh (bubblewrap + strace + canary credentials + audit hook).
 #
 # Run this from your own trusted checkout (e.g. dev), never from inside a PR checkout:
-# this script, the lockfile and the pytest config are all taken from where it lives.
+# this script, the lockfile and the pytest config are all taken from where it lives
+# (or, with --deps-from merge-base, from your own branch's history).
 set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO=$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)
 REMOTE=origin
 BASE=dev
+DEPS_FROM=checkout
 YES=0
 RUN_OPTS=()
 
@@ -33,14 +43,16 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --remote) REMOTE=$2; shift 2 ;;
         --base) BASE=$2; shift 2 ;;
+        --deps-from) DEPS_FROM=$2; shift 2 ;;
         --yes) YES=1; shift ;;
         --python|--out|--fail-on) RUN_OPTS+=("$1" "$2"); shift 2 ;;
         --no-strace) RUN_OPTS+=("$1"); shift ;;
-        -h|--help) sed -n '2,21p' "$0"; exit 0 ;;
+        -h|--help) sed -n '2,29p' "$0"; exit 0 ;;
         -*) die "unknown option $1" ;;
         *) break ;;
     esac
 done
+[[ $DEPS_FROM == checkout || $DEPS_FROM == merge-base ]] || die "--deps-from must be checkout or merge-base"
 [[ $# -ge 1 && $1 =~ ^[0-9]+$ ]] || die "usage: sandbox-pr.sh [options] PR_NUMBER [-- PYTEST_ARGS...]"
 PR=$1; shift
 PYTEST_PASSTHRU=("$@")   # empty, or "--" followed by pytest args
@@ -102,10 +114,22 @@ if [[ $YES != 1 ]]; then
 fi
 
 SRC=$(mktemp -d "${TMPDIR:-/tmp}/deepdiff-pr-$PR-src.XXXXXX")
-trap 'rm -rf "$SRC"' EXIT
+DEPS=""
+trap 'rm -rf "$SRC" ${DEPS:+"$DEPS"}' EXIT
 PATHS=(deepdiff tests)
 "${G[@]}" cat-file -e "$PR_REF:conftest.py" 2>/dev/null && PATHS+=(conftest.py)
 "${G[@]}" archive --format=tar "$PR_REF" -- "${PATHS[@]}" | tar -x -C "$SRC"
+
+if [[ $DEPS_FROM == merge-base ]]; then
+    # Only from the merge-base, which is in BASE's history. Never from the PR's commits.
+    DEPS=$(mktemp -d "${TMPDIR:-/tmp}/deepdiff-pr-$PR-deps.XXXXXX")
+    for f in uv.lock pyproject.toml; do
+        "${G[@]}" show "$MB:$f" >"$DEPS/$f" 2>/dev/null || die "merge-base $MB has no $f"
+    done
+    RUN_OPTS+=(--deps-dir "$DEPS")
+    echo
+    echo "==> dependencies and pytest config from merge-base $("${G[@]}" log -1 --format='%h (%ad)' --date=short "$MB")"
+fi
 
 echo
 "$SCRIPT_DIR/run-sandboxed.sh" "${RUN_OPTS[@]}" "$SRC" "${PYTEST_PASSTHRU[@]}"
