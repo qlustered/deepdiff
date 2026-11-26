@@ -118,7 +118,8 @@ def diff(
             if kwargs["view"] in {'colored', 'colored_compact'}:
                 print(diff)
             else:
-                print(diff.to_json(indent=2))
+                json_options = {} if orjson else {'ensure_ascii': False}
+                print(diff.to_json(indent=2, **json_options))
         except Exception:
             pprint(diff, indent=2)
 
