@@ -27,9 +27,13 @@ class BaseOperatorPlus(metaclass=ABCMeta):
     @abstractmethod
     def normalize_value_for_hashing(self, parent: Any, obj: Any) -> Any:
         """
-        You can use this function to normalize values for ignore_order=True
+        Normalize an individual value before hashing, for example with ignore_order=True.
 
-        For example, you may want to turn all the words to be lowercase. Then you return obj.lower()
+        Unlike give_up_diffing, this method is not gated by match: hashing has no
+        pair of values to compare. Check obj's type or parent path here and return
+        obj unchanged when no normalization applies.
+
+        For case-insensitive strings, return obj.lower() if isinstance(obj, str) else obj.
         """
         pass
 
