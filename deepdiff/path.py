@@ -57,7 +57,8 @@ def _add_to_elements(elements, elem, inside):
             elements.append((SINGLE_WILDCARD if elem == '*' else MULTI_WILDCARD, action))
             return
         remove_quotes = False
-        if '𝆺𝅥𝅯' in elem or '\\' in elem:
+        # Bytes literals need their backslash escapes decoded by literal_eval.
+        if ('𝆺𝅥𝅯' in elem or '\\' in elem) and not elem.startswith(("b'", 'b"')):
             remove_quotes = True
         else:
             try:
@@ -95,9 +96,17 @@ def _path_to_elements(path, root_element=DEFAULT_FIRST_ELEMENT):
     path = path[4:]  # removing "root from the beginning"
     brackets = []
     inside_quotes = False
+    inside_bytes = False
+    escaped = False
     quote_used = ''
     for char in path:
-        if prev_char == '𝆺𝅥𝅯':
+        if inside_bytes and escaped:
+            elem += char
+            escaped = False
+        elif inside_bytes and char == '\\':
+            elem += char
+            escaped = True
+        elif prev_char == '𝆺𝅥𝅯':
             elem += char
         elif char in {'"', "'"}:
             elem += char
@@ -106,7 +115,9 @@ def _path_to_elements(path, root_element=DEFAULT_FIRST_ELEMENT):
                 inside_quotes = not inside_quotes
                 if inside_quotes:
                     quote_used = char
+                    inside_bytes = elem.startswith(("b'", 'b"'))
                 else:
+                    inside_bytes = False
                     _add_to_elements(elements, elem, inside)
                     elem = ''
                     quote_used = ''
@@ -311,6 +322,8 @@ def parse_path(path, root_element=DEFAULT_FIRST_ELEMENT, include_actions=False):
 
 
 def stringify_element(param, quote_str=None):
+    if isinstance(param, bytes):
+        return repr(param)
     has_quote = "'" in param
     has_double_quote = '"' in param
     if has_quote and has_double_quote and not quote_str:
