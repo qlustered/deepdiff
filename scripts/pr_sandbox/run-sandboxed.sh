@@ -20,6 +20,8 @@
 # Environment:
 #   PR_SANDBOX_SHARE_GROUP   group to make the reports readable by (default: ai-dev, if it exists
 #                            and you're a member; "" disables)
+#   PR_SANDBOX_SOURCE        what SRC_DIR was taken from, recorded in report/source.txt
+#                            (sandbox-pr.sh sets it, e.g. "pr 618 <sha>" or "merge <sha> ...")
 #
 # Exit status: 2 if findings reached --fail-on, otherwise pytest's exit status (0 with --monitor-only).
 #
@@ -74,6 +76,7 @@ WORK=$(cd "$OUT" && pwd)
 mkdir -p "$WORK"/{src,home,audit,etc,report}
 REPORT=$WORK/report
 echo "==> work dir: $WORK"
+[[ -z ${PR_SANDBOX_SOURCE:-} ]] || printf '%s\n' "$PR_SANDBOX_SOURCE" >"$REPORT/source.txt"
 
 # Make the reports readable by a shared group, e.g. so an agent running as another user can
 # read them. Defaults to "ai-dev" if that group exists and you're in it. Set
